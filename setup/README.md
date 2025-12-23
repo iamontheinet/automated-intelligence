@@ -15,6 +15,7 @@ These scripts set up the foundational components that are common across all demo
 
 ### Required for All Demos
 - `setup.sql` - **Primary setup script** - Creates database, schemas, warehouse, raw tables, data generation procedures, and Dynamic Tables
+- `create_semantic_model_stage.sql` - Creates stage for semantic model YAML files (infrastructure)
 
 ## Setup Instructions
 
@@ -30,6 +31,9 @@ snow sql -f setup/setup.sql -c dash-builder-si
 ```bash
 # Core setup
 snow sql -f setup/setup.sql -c dash-builder-si
+
+# Create semantic model stage (infrastructure)
+snow sql -f setup/create_semantic_model_stage.sql -c dash-builder-si
 ```
 
 ## What Gets Created

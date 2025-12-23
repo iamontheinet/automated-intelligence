@@ -6,35 +6,33 @@ This directory contains setup scripts for **Snowflake Intelligence** features: C
 
 **Required:** Core setup must be completed first
 ```bash
+# 1. Core infrastructure
 snow sql -f setup/setup.sql -c dash-builder-si
+
+# 2. Semantic model stage
+snow sql -f setup/create_semantic_model_stage.sql -c dash-builder-si
 ```
 
 ## Files
 
 - `business_insights_semantic_model.yaml` - Semantic model definition for Cortex Analyst
-- `create_semantic_model_stage.sql` - Creates stage for semantic model YAML files
 - `create_agent.sql` - Creates Cortex Agent for natural language queries
 - `create_cortex_search.sql` - Creates Cortex Search service for product discovery
 
 ## Setup Instructions
 
-### 1. Create Semantic Model Stage
-```bash
-snow sql -f snowflake-intelligence/create_semantic_model_stage.sql -c dash-builder-si
-```
-
-### 2. Upload Semantic Model
+### 1. Upload Semantic Model
 ```bash
 snow stage copy snowflake-intelligence/business_insights_semantic_model.yaml \
   @automated_intelligence.raw.semantic_models/ --overwrite -c dash-builder-si
 ```
 
-### 3. Create Cortex Agent
+### 2. Create Cortex Agent
 ```bash
 snow sql -f snowflake-intelligence/create_agent.sql -c dash-builder-si
 ```
 
-### 4. Create Cortex Search Service
+### 3. Create Cortex Search Service
 ```bash
 snow sql -f snowflake-intelligence/create_cortex_search.sql -c dash-builder-si
 ```
