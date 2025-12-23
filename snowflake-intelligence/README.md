@@ -96,4 +96,3 @@ SELECT PARSE_JSON(
 
 ## Related Demos
 - **Streamlit Dashboard**: Integrates with Cortex Agent for natural language queries
-- **Agent Evaluation**: AI Observability for monitoring agent performance

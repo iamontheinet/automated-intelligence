@@ -556,10 +556,6 @@ automated-intelligence/
 │   ├── environment.yml         # Snowflake dependencies
 │   └── README.md               # Streamlit setup and deployment
 │
-├── agent-evaluation/           # Optional: AI Observability
-│   ├── evaluate_order_analytics.py
-│   └── README.md
-│
 ├── openflow-ingestion/         # Experimental: Openflow → Iceberg (untested)
 │   └── README.md               # ⚠️ Reference implementation only
 │
