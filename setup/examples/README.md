@@ -5,7 +5,7 @@ This directory contains example notebooks and SQL scripts demonstrating features
 ## Files
 
 ### AI Functions Examples
-- `ai_functions_notebook.ipynb` - Interactive notebook demonstrating Cortex AI functions
+- `test_ai_functions.ipynb` - Interactive notebook demonstrating Cortex AI functions
 
 **Uses tables:** `product_reviews`, `support_tickets`, `product_catalog` (all created in `setup.sql`)
 
@@ -17,7 +17,7 @@ This directory contains example notebooks and SQL scripts demonstrating features
 - `CORTEX.SEARCH_PREVIEW()` - Product search demonstrations
 
 ### Dynamic Tables Deep Dive
-- `Dash_AI_DT.ipynb` - **Interactive tutorial** on Dynamic Tables incremental refresh
+- `test_dynamic_tables.ipynb` - Interactive tutorial on Dynamic Tables incremental refresh
 
 **Demonstrates:**
 - Step-by-step data flow through 3-tier pipeline
@@ -52,8 +52,8 @@ snow sql -f setup/examples/test_data_quality.sql -c dash-builder-si
 jupyter notebook setup/examples/
 
 # Open any .ipynb file
-# - Dash_AI_DT.ipynb for Dynamic Tables tutorial
-# - ai_functions_notebook.ipynb for AI functions
+# - test_dynamic_tables.ipynb for Dynamic Tables tutorial
+# - test_ai_functions.ipynb for AI functions
 # - test_data_quality.ipynb for data quality checks
 ```
 
