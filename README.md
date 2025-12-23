@@ -503,7 +503,7 @@ automated-intelligence/
 │   ├── create_cortex_search.sql # Cortex Search for product discovery
 │   ├── business_insights_semantic_model.yaml  # Semantic model definition
 │   ├── README.md               # Setup instructions and verification
-│   ├── examples/               # Tutorials and example scripts
+│   └── examples/               # Tutorials and example scripts
 │   │   ├── ai_functions_notebook.ipynb  # Interactive AI functions tutorial
 │   │   ├── Dash_AI_DT.ipynb             # Dynamic Tables deep dive tutorial
 │   │   ├── test_data_quality.sql        # Data quality validation
@@ -627,21 +627,83 @@ CALL automated_intelligence.raw.generate_orders(1000);
 
 **In production:** Tier 1's scheduled refresh automatically triggers Tier 2 → Tier 3. Zero manual intervention!
 
-### Dynamic Tables - Real-Time Configuration (Default)
+### Dynamic Tables - Configuration & Data Freshness
 
-⚡ **1-minute TARGET_LAG by default** - Optimized for real-time demos and dashboards.
+#### 3-Tier Architecture
 
-- **Data freshness**: ~1-2 minutes from ingestion to analytics
-- **Cost**: ~1,440 warehouse refreshes/day (60/hour × 24 hours)
-- **Use case**: Live dashboards, operational monitoring, real-time insights
+**Layer 1: Base Enrichment** (1 minute lag)
+- `enriched_orders`: `TARGET_LAG = '1 minute'`
+- `enriched_order_items`: `TARGET_LAG = '1 minute'`
+- Reads from raw tables populated by Snowpipe Streaming
 
-**Want batch processing instead?** Change to 12-hour lag for 720x lower warehouse costs:
+**Layer 2: Fact Tables** (Downstream)
+- `fact_orders`: `TARGET_LAG = DOWNSTREAM`
+- Refreshes immediately after Layer 1
+
+**Layer 3: Metrics** (Downstream)
+- `daily_business_metrics`: `TARGET_LAG = DOWNSTREAM`
+- `product_performance_metrics`: `TARGET_LAG = DOWNSTREAM`
+- Refreshes immediately after Layer 2
+
+#### Data Freshness Flow
+```
+Snowpipe Streaming (sub-second)
+    ↓
+raw.orders, raw.order_items
+    ↓ (1 minute lag)
+enriched_orders, enriched_order_items
+    ↓ (DOWNSTREAM = immediate)
+fact_orders
+    ↓ (DOWNSTREAM = immediate)
+daily_business_metrics, product_performance_metrics
+```
+
+**Total end-to-end latency: ~1-2 minutes from ingestion to analytics**
+
+#### Default Configuration: Real-Time (1 Minute)
+
+⚡ **Automatically applied by setup.sql** - No additional steps needed!
+
+**Benefits:**
+- Dashboard updates within 1-2 minutes
+- Ideal for live demos and operational monitoring
+- Only Layer 1 actively polls (Layers 2-3 cascade automatically)
+
+**Cost:**
+- ~1,440 warehouse refreshes/day (60/hour × 24 hours)
+- Warehouse active ~1 minute per refresh
+- **720x more credits** than 12-hour batch processing
+
+#### Alternative: Batch Processing (12 Hours)
+
+For lower costs in production:
 ```sql
 ALTER DYNAMIC TABLE enriched_orders SET TARGET_LAG = '12 hours';
 ALTER DYNAMIC TABLE enriched_order_items SET TARGET_LAG = '12 hours';
+-- Downstream tables automatically adjust (still DOWNSTREAM)
 ```
 
-📖 **Full configuration guide**: `setup/docs/DYNAMIC_TABLE_CONFIGURATION.md`
+**Cost difference:** 2 refreshes/day vs 1,440 refreshes/day
+
+#### When to Use Each Configuration
+
+| Use Case | Recommended Lag |
+|----------|----------------|
+| Live operational dashboard | 1 minute |
+| Real-time fraud detection | 1 minute |
+| Customer service tools | 1 minute |
+| Executive daily reports | 12 hours |
+| Weekly business reviews | 12 hours |
+| Cost optimization | 12 hours |
+
+#### Verify Your Configuration
+```bash
+for table in enriched_orders enriched_order_items fact_orders daily_business_metrics product_performance_metrics; do
+  echo "=== $table ==="
+  snow sql -c dash-builder-si --role snowflake_intelligence_admin -q \
+    "SELECT GET_DDL('TABLE', 'automated_intelligence.dynamic_tables.$table');" | grep target_lag
+done
+```
 
 ### Interactive Warehouses
 
