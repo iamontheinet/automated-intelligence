@@ -1,0 +1,555 @@
+name: business_insights_semantic_model
+description: |
+  Comprehensive semantic model for analyzing e-commerce business performance across orders, customers, products, support interactions, and reviews. Optimized for revenue analysis, customer segmentation, product performance, and operational insights.
+tables:
+  - name: daily_business_metrics
+    synonyms:
+      - business metrics
+      - daily business data
+      - daily metrics
+    description: Pre-aggregated daily business metrics with automatic refresh
+    base_table:
+      database: automated_intelligence
+      schema: dynamic_tables
+      table: daily_business_metrics
+    dimensions:
+      - name: day_of_week
+        synonyms:
+          - day name
+          - day of week
+          - weekday
+        description: The day of the week (0-6, where 0=Sunday)
+        data_type: NUMBER
+        expr: day_of_week
+      - name: day_type
+        synonyms:
+          - weekend or weekday
+        description: Whether the day is a Weekend or Weekday
+        data_type: TEXT
+        expr: day_type
+        sample_values:
+          - Weekday
+          - Weekend
+        is_enum: true
+      - name: order_date_only
+        synonyms:
+          - date
+          - day
+          - order date
+        description: The calendar date of orders (YYYY-MM-DD format)
+        data_type: DATE
+        expr: order_date_only
+      - name: order_month
+        synonyms:
+          - month
+        description: The month of orders (1-12)
+        data_type: NUMBER
+        expr: order_month
+        sample_values:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+      - name: order_year
+        synonyms:
+          - year
+        description: The year of orders (e.g., 2024)
+        data_type: NUMBER
+        expr: order_year
+        sample_values:
+          - 2023
+          - 2024
+          - 2025
+    facts:
+      - name: avg_discount_percent
+        synonyms:
+          - average discount
+        description: Average discount percentage applied
+        expr: avg_discount_percent
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: avg_order_value
+        synonyms:
+          - AOV
+          - average order
+        description: Average order value (revenue per order)
+        expr: avg_order_value
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: large_orders_count
+        synonyms:
+          - big orders
+          - orders over 500
+        description: Number of orders exceeding $500 in value
+        expr: large_orders
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: multi_item_orders_count
+        synonyms:
+          - orders with multiple items
+        description: Number of orders containing more than 5 items
+        expr: multi_item_orders
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: net_revenue
+        synonyms:
+          - net sales
+          - revenue after discounts
+        description: Net revenue after applying all discounts
+        expr: total_net_revenue
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_discounts
+        synonyms:
+          - discount amount
+          - discounts
+        description: Total dollar amount of discounts given
+        expr: total_discounts
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_orders
+        synonyms:
+          - number of orders
+          - order count
+          - orders
+        description: Total number of orders placed
+        expr: total_orders
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_revenue
+        synonyms:
+          - gross revenue
+          - revenue
+          - sales
+        description: Total revenue from all orders (net after discounts)
+        expr: total_net_revenue
+        data_type: NUMBER
+        default_aggregation: sum
+    filters:
+      - name: CURRENT_MONTH_DATA
+        synonyms:
+          - current_month
+          - month_to_date
+          - this_month
+        description: Use on daily business metrics to include only data from the current calendar month.
+        expr: order_year = YEAR(CURRENT_DATE) AND order_month = MONTH(CURRENT_DATE)
+      - name: DAYS_WITH_LARGE_ORDERS
+        synonyms:
+          - has_large_orders
+          - high_value_days
+          - premium_order_days
+        description: Use on daily business metrics to include only days that had at least one large order (over $500).
+        expr: large_orders > 0
+      - name: DAYS_WITH_MULTI_ITEM_ORDERS
+        synonyms:
+          - cross_sell_days
+          - has_multi_item_orders
+          - multi_item_days
+        description: Use on daily business metrics to include only days that had at least one order containing multiple items.
+        expr: multi_item_orders > 0
+      - name: LAST_30_DAYS
+        synonyms:
+          - 30_day_window
+          - last_month
+          - recent_data
+        description: Use on daily business metrics to include only data from the last 30 days for recent trend analysis.
+        expr: order_date_only >= DATEADD(DAY, -30, CURRENT_DATE)
+      - name: LAST_90_DAYS
+        synonyms:
+          - 90_day_window
+          - last_quarter
+          - quarterly_data
+        description: Use on daily business metrics to include only data from the last 90 days for quarterly trend analysis.
+        expr: order_date_only >= DATEADD(DAY, -90, CURRENT_DATE)
+    metrics:
+      - name: AVG_DAILY_ORDERS
+        synonyms:
+          - daily_order_average
+          - orders_per_day
+        description: Average number of orders per day calculated across a time period. Use for comparing order volume patterns between different days of the week, identifying peak ordering days, and understanding daily operational capacity requirements. Essential for staffing decisions and inventory planning based on day-of-week patterns.
+        expr: AVG(daily_business_metrics.total_orders)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+      - name: AVG_DAILY_REVENUE
+        synonyms:
+          - average daily sales
+          - daily revenue average
+        description: Average daily revenue calculated across a time period. Use for comparing average performance between different day types (weekdays vs weekends), seasonal periods, or time ranges. Essential for understanding typical daily performance and identifying above/below average revenue days.
+        expr: AVG(daily_business_metrics.total_net_revenue)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+      - name: AVG_ORDER_VALUE_BY_DAY
+        synonyms:
+          - aov_by_day
+          - daily_aov_average
+        description: Average order value calculated per day and then averaged across multiple days. Use for understanding how customer spending patterns vary by day of the week, identifying days when customers make larger purchases, and optimizing promotional strategies for specific days. Critical for revenue optimization and day-specific marketing campaigns.
+        expr: AVG(daily_business_metrics.avg_order_value)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+  - name: customers
+    synonyms:
+      - customer data
+      - customer info
+    description: Customer profiles with demographic information and segmentation
+    base_table:
+      database: automated_intelligence
+      schema: raw
+      table: customers
+    dimensions:
+      - name: customer_id
+        synonyms:
+          - cust ID
+          - customer ID
+        description: Unique identifier for each customer
+        data_type: NUMBER
+        expr: customer_id
+        unique: true
+      - name: customer_name
+        synonyms:
+          - customer
+          - name
+        description: Full name of the customer
+        data_type: TEXT
+        expr: CONCAT(first_name, ' ', last_name)
+      - name: customer_segment
+        synonyms:
+          - customer tier
+          - customer type
+          - segment
+        description: Customer segment (Premium or Standard only)
+        data_type: TEXT
+        expr: customer_segment
+        sample_values:
+          - Premium
+          - Standard
+        is_enum: true
+      - name: customer_state
+        synonyms:
+          - location
+          - state
+        description: State where the customer is located
+        data_type: TEXT
+        expr: state
+      - name: registration_date
+        synonyms:
+          - joined date
+          - signup date
+        description: Date when customer registered
+        data_type: DATE
+        expr: registration_date
+    filters:
+      - name: VALID_CUSTOMER_SEGMENTS
+        synonyms:
+          - active_segments
+          - premium_standard_only
+          - valid_segments
+        description: Use on customers to include only Premium and Standard customer segments, excluding any invalid or null segment values.
+        expr: customer_segment IN ('Premium', 'Standard')
+    primary_key:
+      columns:
+        - CUSTOMER_ID
+  - name: orders
+    synonyms:
+      - order data
+      - transactions
+    description: Individual order transactions with pricing and discount details
+    base_table:
+      database: automated_intelligence
+      schema: raw
+      table: orders
+    dimensions:
+      - name: customer_id
+        synonyms:
+          - customer ID
+        description: ID of the customer who placed the order
+        data_type: NUMBER
+        expr: customer_id
+      - name: discount_percentage
+        synonyms:
+          - discount %
+          - discount rate
+        description: Percentage discount applied to the order (0-100)
+        data_type: NUMBER
+        expr: discount_percent
+      - name: order_date
+        synonyms:
+          - date
+          - order timestamp
+        description: Date and time when order was placed
+        data_type: TIMESTAMP
+        expr: order_date
+      - name: order_id
+        synonyms:
+          - order ID
+        description: Unique identifier for each order
+        data_type: TEXT
+        expr: order_id
+        unique: true
+      - name: order_status
+        synonyms:
+          - status
+        description: Current status of the order
+        data_type: TEXT
+        expr: order_status
+        sample_values:
+          - Pending
+          - Completed
+          - Cancelled
+        is_enum: true
+    facts:
+      - name: discount_amount
+        synonyms:
+          - discount
+        description: Dollar amount of discount applied
+        expr: total_amount * (discount_percent / 100)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: final_amount
+        synonyms:
+          - amount after discount
+          - net amount
+        description: Final order amount after discount and shipping
+        expr: total_amount * (1 - discount_percent / 100) + shipping_cost
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: order_total
+        synonyms:
+          - order amount
+          - total
+        description: Total order amount before discount
+        expr: total_amount
+        data_type: NUMBER
+        default_aggregation: sum
+    metrics:
+      - name: ORDER_COUNT
+        synonyms:
+          - order_volume
+          - transaction_count
+        description: Total number of distinct orders placed. Use for measuring order volume, calculating conversion rates, and analyzing ordering patterns by customer segment or time period. Essential for understanding transaction frequency and customer behavior patterns.
+        expr: COUNT(DISTINCT orders.order_id)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+      - name: SEGMENT_AOV
+        synonyms:
+          - average_segment_order
+          - segment_order_value
+        description: Average order value including shipping costs after discounts, calculated per customer segment. Use for comparing spending patterns between Premium and Standard customers, identifying high-value segments, and optimizing pricing strategies. Critical for understanding customer segment value and purchasing behavior.
+        expr: AVG(orders.total_amount * (1 - orders.discount_percent / 100) + orders.shipping_cost)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+  - name: product_catalog
+    synonyms:
+      - product data
+      - products
+    description: Product catalog with winter sports equipment details
+    base_table:
+      database: automated_intelligence
+      schema: raw
+      table: product_catalog
+    dimensions:
+      - name: description
+        synonyms:
+          - product description
+        description: Detailed product description and features
+        data_type: TEXT
+        expr: description
+      - name: product_category
+        synonyms:
+          - category
+          - product type
+        description: Category of winter sports product
+        data_type: TEXT
+        expr: product_category
+        sample_values:
+          - Skis
+          - Snowboards
+          - Boots
+          - Poles
+          - Helmets
+          - Goggles
+      - name: product_id
+        synonyms:
+          - product ID
+        description: Unique identifier for each product
+        data_type: NUMBER
+        expr: product_id
+        unique: true
+      - name: product_name
+        synonyms:
+          - name
+          - product
+        description: Name of the product
+        data_type: TEXT
+        expr: product_name
+    facts:
+      - name: price
+        synonyms:
+          - cost
+          - product price
+        description: Current price of the product
+        expr: price
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: stock_quantity
+        synonyms:
+          - inventory
+          - quantity available
+          - stock
+        description: Current inventory quantity
+        expr: stock_quantity
+        data_type: NUMBER
+        default_aggregation: sum
+relationships:
+  - name: orders_to_customers
+    left_table: orders
+    right_table: customers
+    relationship_columns:
+      - left_column: customer_id
+        right_column: CUSTOMER_ID
+    relationship_type: many_to_one
+verified_queries:
+  - name: revenue_trend_last_7_days
+    question: What's the revenue trend for the last 7 days?
+    sql: |
+      SELECT 
+        order_date_only,
+        total_net_revenue as total_revenue,
+        total_net_revenue as net_revenue
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -7, CURRENT_DATE())
+      ORDER BY order_date_only
+    verified_at: 1733702400
+    verified_by: Data Team
+    use_as_onboarding_question: true
+  - name: top_revenue_days_this_month
+    question: Which days had the highest revenue this month?
+    sql: |
+      SELECT 
+        order_date_only,
+        total_net_revenue as total_revenue
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_year = YEAR(CURRENT_DATE())
+        AND order_month = MONTH(CURRENT_DATE())
+      ORDER BY total_net_revenue DESC
+      LIMIT 5
+    verified_at: 1733702400
+    verified_by: Data Team
+    use_as_onboarding_question: true
+  - name: weekday_vs_weekend_performance
+    question: Compare revenue between weekdays and weekends
+    sql: |
+      SELECT 
+        CASE 
+          WHEN day_of_week IN (0, 6) THEN 'Weekend'
+          ELSE 'Weekday'
+        END AS period_type,
+        SUM(total_net_revenue) as total_revenue,
+        COUNT(*) as num_days,
+        AVG(total_net_revenue) as avg_daily_revenue
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -30, CURRENT_DATE())
+      GROUP BY period_type
+    verified_at: 1733702400
+    verified_by: Data Team
+  - name: discount_impact_analysis
+    question: What's the impact of discounts on revenue?
+    sql: |
+      SELECT 
+        (SUM(total_discounts) / NULLIF(SUM(total_net_revenue) + SUM(total_discounts), 0)) * 100 as discount_penetration_pct,
+        SUM(total_discounts) as total_discounts_given,
+        SUM(total_net_revenue) as net_revenue,
+        SUM(total_net_revenue) + SUM(total_discounts) as gross_revenue
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -30, CURRENT_DATE())
+    verified_at: 1733702400
+    verified_by: Data Team
+  - name: premium_vs_standard_revenue
+    question: Compare revenue between Premium and Standard customer segments
+    sql: |
+      SELECT 
+        c.customer_segment,
+        SUM(o.total_amount * (1 - o.discount_percent / 100) + o.shipping_cost) as total_revenue,
+        COUNT(DISTINCT o.order_id) as total_orders,
+        AVG(o.total_amount * (1 - o.discount_percent / 100) + o.shipping_cost) as avg_order_value
+      FROM automated_intelligence.raw.orders o
+      JOIN automated_intelligence.raw.customers c ON o.customer_id = c.customer_id
+      WHERE o.order_date >= DATEADD('day', -30, CURRENT_DATE())
+      GROUP BY c.customer_segment
+    verified_at: 1733702400
+    verified_by: Data Team
+  - name: top_performing_days_of_week
+    question: Which day of the week generates the most revenue?
+    sql: |
+      SELECT 
+        day_of_week,
+        SUM(total_net_revenue) as total_revenue,
+        AVG(total_orders) as avg_orders_per_day,
+        AVG(avg_order_value) as avg_order_value
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -90, CURRENT_DATE())
+      GROUP BY day_of_week
+      ORDER BY total_revenue DESC
+    verified_at: 1733702400
+    verified_by: Data Team
+  - name: large_order_trend
+    question: What's the trend in large orders (over $500)?
+    sql: |
+      SELECT 
+        order_date_only,
+        large_orders,
+        total_orders
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -30, CURRENT_DATE())
+      ORDER BY order_date_only
+    verified_at: 1733702400
+    verified_by: Data Team
+  - name: multi_item_order_analysis
+    question: Analyze orders with multiple items
+    sql: |
+      SELECT 
+        order_date_only,
+        multi_item_orders,
+        total_orders
+      FROM automated_intelligence.dynamic_tables.daily_business_metrics
+      WHERE order_date_only >= DATEADD('day', -30, CURRENT_DATE())
+      ORDER BY order_date_only
+    verified_at: 1733702400
+    verified_by: Data Team
+module_custom_instructions:
+  sql_generation: |-
+    For revenue trend questions, include both total_revenue and net_revenue columns in the output and sort results in chronological order (oldest to newest dates).
+
+    For questions asking for "highest", "lowest", "best", "worst", or similar superlatives, limit results to top 5 by default unless a specific number is requested.
+
+    For questions comparing weekdays vs weekends: 1) Use day_of_week column with values 0 and 6 representing weekends, 2) Default to last 30 days of data unless specified otherwise, 3) Include total revenue, count of days, and average daily revenue for meaningful comparison.
+
+    For questions comparing customer segments or other categorical data, apply a 30-day date filter by default unless a different time period is specified. For comparison questions, include all available categories in the comparison and focus on core metrics (revenue, orders, AOV) without adding percentage calculations or date range columns unless specifically requested.
+
+    For questions analyzing day of the week performance: 1) Apply a 90-day date filter by default, 2) Return all days of the week ranked by the requested metric, 3) Include total revenue, average orders per day, and average order value in the results.
+
+    For questions analyzing trends in business metrics: 1) Apply a 30-day date filter by default, 2) Include both absolute counts and percentage calculations when analyzing order categories, 3) Sort results chronologically (oldest to newest dates) to show trend progression.
+
+    For questions analyzing business metrics or order patterns: 1) Maintain daily granularity in results rather than aggregating to summary statistics, 2) Do not filter out days with zero values for the metric being analyzed as this skews percentage calculations, 3) Apply the 30-day default date filter, 4) Sort results chronologically to show trends.
