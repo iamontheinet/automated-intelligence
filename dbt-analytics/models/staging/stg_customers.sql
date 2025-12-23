@@ -8,17 +8,15 @@ with source as (
 staged as (
     select
         customer_id,
-        customer_name,
+        first_name || ' ' || last_name as customer_name,
         email,
         phone,
         address,
         city,
         state,
         zip_code,
-        country,
-        signup_date,
+        registration_date as signup_date,
         customer_segment,
-        preferred_contact_method,
         
         -- Derived fields
         datediff('day', signup_date, current_date()) as days_since_signup,
