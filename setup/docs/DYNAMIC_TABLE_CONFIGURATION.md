@@ -49,12 +49,10 @@ This configuration is optimized for real-time demo scenarios, showcasing how qui
 - Downstream tables cascade automatically (no redundant polling)
 - Warehouse spins up once per minute (not per table)
 
-## Configuration Scripts
+## Verification
 
-### Apply Near Real-Time Configuration
-```bash
-snow sql -c dash-builder-si -f setup/set_realtime_lag.sql
-```
+### Default Configuration (1 Minute)
+This configuration is **automatically applied** when you run `setup/setup.sql`. No additional scripts needed!
 
 ### Verify Configuration
 ```bash
@@ -83,7 +81,9 @@ target_lag = 'DOWNSTREAM'
 target_lag = 'DOWNSTREAM'
 ```
 
-## Alternative: Batch Processing (12 hours)
+## Alternative Configurations
+
+### Batch Processing (12 hours)
 
 If you prefer lower costs over freshness, change base tables to 12 hours:
 
@@ -122,5 +122,5 @@ ALTER DYNAMIC TABLE enriched_order_items SET TARGET_LAG = '12 hours';
 ## History
 
 - **Initial setup**: 12-hour lag (batch processing)
-- **Dec 9, 2025**: Changed to 1-minute lag for near real-time analytics
-- **Reason**: Enable live dashboards with Snowpipe Streaming integration
+- **December 23, 2024**: Changed to 1-minute lag as DEFAULT in setup.sql
+- **Reason**: Enable live dashboards and real-time analytics out-of-the-box
