@@ -1,0 +1,24 @@
+automated_intelligence:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: sfsenorthamerica-gen_ai_hol
+      user: dash
+      role: SNOWFLAKE_INTELLIGENCE_ADMIN
+      warehouse: automated_intelligence_wh
+      database: automated_intelligence
+      schema: staging
+      threads: 4
+      client_session_keep_alive: False
+      
+      # Authentication
+      # Option 1: Password (set via environment variable)
+      # password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      
+      # Option 2: SSO browser-based auth
+      # authenticator: externalbrowser
+      
+      # Option 3: Key pair authentication
+      # private_key_path: /path/to/private_key.p8
+      # private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}"
