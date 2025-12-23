@@ -758,6 +758,18 @@ SELECT 'Dynamic Tables', 'product_performance_metrics', COUNT(*)
 FROM automated_intelligence.dynamic_tables.product_performance_metrics
 ORDER BY category, table_name;
 
+-- ============================================================================
+-- Create Stage for Semantic Model Storage
+-- ============================================================================
+-- This stage stores semantic model YAML files used by Cortex Analyst
+-- for natural language to SQL translation.
+
+CREATE STAGE IF NOT EXISTS automated_intelligence.raw.semantic_models
+    DIRECTORY = (ENABLE = TRUE)
+    COMMENT = 'Stage for storing semantic model YAML files for Cortex Analyst';
+
+SHOW STAGES LIKE 'semantic_models' IN automated_intelligence.raw;
+
 -- Insert new orders
 SET NEW_ORDERS = 10000;
 CALL automated_intelligence.raw.generate_orders($NEW_ORDERS);
