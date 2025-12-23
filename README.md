@@ -500,8 +500,8 @@ automated-intelligence/
 │   ├── setup.sql               # Database, schemas, warehouse, raw tables, dynamic tables
 │   ├── README.md               # Setup instructions and verification
 │   └── examples/               # Tutorials and example scripts
-│       ├── ai_functions_notebook.ipynb  # Interactive AI functions tutorial
-│       ├── Dash_AI_DT.ipynb             # Dynamic Tables deep dive tutorial
+│       ├── test_ai_functions.ipynb      # Interactive AI functions tutorial
+│       ├── test_dynamic_tables.ipynb    # Dynamic Tables deep dive tutorial
 │       ├── test_data_quality.sql        # Data quality validation
 │       └── test_data_quality.ipynb      # Interactive DQ notebook
 │
