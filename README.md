@@ -512,7 +512,6 @@ automated-intelligence/
 │   └── docs/                   # Reference docs and maintenance scripts
 │       ├── DYNAMIC_TABLE_CONFIGURATION.md   # DT configuration reference
 │       ├── DYNAMIC_TABLE_LAG_FIX.md         # DT troubleshooting guide
-│       ├── set_realtime_lag.sql             # Configure real-time lag
 │       └── reset_tables.sql                 # Reset data for fresh start
 │
 ├── sql/                        # Demo 1: Gen2 Warehouse (component-specific setup)

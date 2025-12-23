@@ -16,14 +16,7 @@ This directory contains reference documentation and maintenance scripts for the 
 
 ## Maintenance Scripts
 
-⚠️ **Use with caution** - These scripts modify system configuration or reset data.
-
-### Dynamic Tables Configuration
-- `set_realtime_lag.sql` - Configure Dynamic Tables for real-time (1 second) lag
-
-**When to use:**
-- For demo scenarios requiring sub-second freshness
-- Default is 12 hours (batch analytics), this switches to near real-time
+⚠️ **Use with caution** - These scripts modify or reset data.
 
 ### Data Management
 - `reset_tables.sql` - Reset and recreate tables for fresh start
@@ -45,9 +38,6 @@ cat setup/docs/DYNAMIC_TABLE_LAG_FIX.md
 
 ### Run Maintenance Scripts
 ```bash
-# Set real-time lag (for demos requiring sub-second freshness)
-snow sql -f setup/docs/set_realtime_lag.sql -c dash-builder-si
-
 # Reset tables (⚠️ deletes data!)
 snow sql -f setup/docs/reset_tables.sql -c dash-builder-si
 ```

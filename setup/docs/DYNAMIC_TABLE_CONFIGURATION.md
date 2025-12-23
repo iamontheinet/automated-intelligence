@@ -1,6 +1,6 @@
 # Dynamic Table Configuration - Near Real-Time Analytics
 
-## Current Configuration (December 9, 2025)
+## Current Configuration
 
 ### Layer 1: Base Enrichment (1 minute lag)
 - **enriched_orders**: `TARGET_LAG = '1 minute'` ✓
@@ -34,6 +34,8 @@ daily_business_metrics, product_performance_metrics
 ```
 
 **Total end-to-end latency: ~1-2 minutes from ingestion to analytics**
+
+This configuration is optimized for real-time demo scenarios, showcasing how quickly data flows through the entire pipeline.
 
 ## What This Enables
 

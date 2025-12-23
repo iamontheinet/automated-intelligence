@@ -316,8 +316,9 @@ DROP DYNAMIC TABLE IF EXISTS enriched_orders;
 -- ----------------------------------------------------------------------------
 
 -- Enriched Orders: Add temporal dimensions and financial calculations
+-- TARGET_LAG = '1 minute' for near real-time analytics (matches Snowpipe Streaming latency)
 CREATE OR REPLACE DYNAMIC TABLE enriched_orders
-TARGET_LAG = '12 hours'
+TARGET_LAG = '1 minute'
 WAREHOUSE = automated_intelligence_wh
 REFRESH_MODE = INCREMENTAL
 AS
@@ -363,8 +364,9 @@ SELECT
 FROM automated_intelligence.raw.orders o;
 
 -- Enriched Order Items: Add price analysis and category flags
+-- TARGET_LAG = '1 minute' for near real-time analytics (matches Snowpipe Streaming latency)
 CREATE OR REPLACE DYNAMIC TABLE enriched_order_items
-TARGET_LAG = '12 hours'
+TARGET_LAG = '1 minute'
 WAREHOUSE = automated_intelligence_wh
 REFRESH_MODE = INCREMENTAL
 AS
