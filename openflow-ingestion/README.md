@@ -1,8 +1,10 @@
 # Openflow → Iceberg Integration
 
-## Status: ✅ 100% COMPLETE - Ready for Testing
+## Status: ⚠️ NOT FULLY TESTED - Implementation Scripts Available
 
-This folder contains a complete implementation for ingesting data into **Apache Iceberg tables** using **Snowflake Openflow** (Apache NiFi). This creates a **hybrid architecture** where operational data flows through Snowpipe Streaming to native tables, while analytics data flows through Openflow to open-format Iceberg tables.
+This folder contains implementation scripts for ingesting data into **Apache Iceberg tables** using **Snowflake Openflow** (Apache NiFi). **This integration has not been fully tested or verified in production.** The scripts and configuration are provided as a reference implementation but may require debugging and adjustments.
+
+**Use with caution:** This is exploratory work that was tabled during development due to complexity concerns.
 
 ---
 
@@ -25,15 +27,15 @@ Snowflake  Spark  Databricks  Trino
 
 ---
 
-## Quick Start (5 minutes to test)
+## Quick Start (If Continuing This Work)
 
-### Prerequisites ✅ COMPLETE
-All setup steps completed! You have:
-- ✅ External volume `aws_s3_ext_volume_snowflake` configured and tested
-- ✅ Iceberg tables created in `automated_intelligence.analytics_iceberg`
-- ✅ Openflow pipeline created with 6 processors + 3 controller services
+### Prerequisites ⚠️ NEEDS VERIFICATION
+Setup scripts have been executed but not fully verified:
+- ⚠️ External volume `aws_s3_ext_volume_snowflake` - may need configuration
+- ⚠️ Iceberg tables created in `automated_intelligence.analytics_iceberg` - not validated
+- ⚠️ Openflow pipeline created with 6 processors + 3 controller services - untested
 
-### Test the Pipeline (5 min)
+### Test the Pipeline (Requires Debugging)
 
 1. **Start the flow in Openflow UI:**
    ```
@@ -238,23 +240,26 @@ TO ROLE snowflake_intelligence_admin;
 
 ## Success Criteria
 
-✅ Iceberg tables exist in `analytics_iceberg` schema  
-✅ Openflow flow created with 6 processors + 3 controller services  
-⏳ **Next:** Start flow and verify data appears in Iceberg tables  
-⏳ **Next:** Verify time travel works (query past snapshots)  
-⏳ **Next:** Validate S3 Parquet files are created
+⚠️ **NOT VERIFIED** - The following would need validation:  
+- Iceberg tables exist in `analytics_iceberg` schema (created but not tested)
+- Openflow flow created with 6 processors + 3 controller services (configured but not verified)
+- Data flowing successfully into Iceberg tables (not tested)
+- Time travel functionality working (not tested)
+- S3 Parquet files being created correctly (not verified)
 
 ---
 
-## Next Steps
+## Important Notes
 
-**Immediate (5 min):**
-1. Start Openflow processors in UI
-2. Monitor flow (check for bulletins/errors)
-3. Query Iceberg tables to verify data
+**This implementation was tabled during development for the following reasons:**
+1. **Complexity concerns**: JDBC hostname transformation issues and debugging complexity
+2. **Not production-ready**: Scripts exist but end-to-end flow has not been validated
+3. **Alternative approaches**: Kafka → Iceberg is officially supported; this Openflow approach is exploratory
 
-**Optional Enhancements:**
-- Add monitoring dashboard
-- Set up alerts for flow failures
-- Connect external tools (Spark/Trino) to S3 Iceberg tables
-- Add to Streamlit dashboard
+**If you decide to continue this work:**
+- Expect to spend significant time debugging
+- The JDBC connection issues (hostname transformation) may still be present
+- Thorough testing of each component will be required
+- Consider whether Kafka Connector or staging table patterns might be simpler alternatives
+
+
