@@ -87,14 +87,15 @@ vars:
 - **Marts**: Tables (optimized for queries)
 
 ### Schema Layout
-- `staging` - Staging layer views
-- `analytics` - Analytical marts tables
+- `dbt_staging` - Staging layer views (dbt-managed)
+- `dbt_analytics` - Analytical marts tables (dbt-managed)
+- Clear separation from real-time schemas: `raw`, `staging`, `dynamic_tables`, `interactive`
 
 ## Setup
 
 ### Prerequisites
 1. Snowflake account with necessary privileges
-2. Database and schemas created (`staging`, `analytics`)
+2. Database and schemas created (`dbt_staging`, `dbt_analytics`)
 3. Raw data tables populated in `automated_intelligence.raw` schema
 4. Snowflake CLI installed (for deployment) - [Installation Guide](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index)
 
@@ -200,7 +201,7 @@ SELECT
     behavioral_segment,
     COUNT(*) as customer_count,
     SUM(total_revenue) as segment_revenue
-FROM automated_intelligence.analytics.customer_segmentation
+FROM automated_intelligence.dbt_analytics.customer_segmentation
 GROUP BY behavioral_segment
 ORDER BY segment_revenue DESC;
 
@@ -211,7 +212,7 @@ SELECT
     confidence,
     lift,
     recommendation_message
-FROM automated_intelligence.analytics.product_recommendations
+FROM automated_intelligence.dbt_analytics.product_recommendations
 WHERE source_product_id = 'PROD_001'
 ORDER BY recommendation_rank;
 
@@ -221,7 +222,7 @@ SELECT
     months_since_signup,
     retention_rate,
     cohort_health
-FROM automated_intelligence.analytics.monthly_cohorts
+FROM automated_intelligence.dbt_analytics.monthly_cohorts
 WHERE cohort_month >= '2024-01-01'
 ORDER BY cohort_month, months_since_signup;
 ```
@@ -255,14 +256,14 @@ See [DEPLOYMENT.md](DEPLOYMENT.md#scheduling--automation) for comprehensive sche
 
 **Option 1: Simple Daily Refresh**
 ```sql
-CREATE OR REPLACE TASK automated_intelligence.staging.dbt_daily_refresh
+CREATE OR REPLACE TASK automated_intelligence.dbt_staging.dbt_daily_refresh
   WAREHOUSE = automated_intelligence_wh
   SCHEDULE = 'USING CRON 0 2 * * * America/Los_Angeles'
 AS
-  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+  EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
     ARGS = 'run --target prod';
 
-ALTER TASK automated_intelligence.staging.dbt_daily_refresh RESUME;
+ALTER TASK automated_intelligence.dbt_staging.dbt_daily_refresh RESUME;
 ```
 
 **Option 2: Orchestration Tool (Airflow/etc.)**

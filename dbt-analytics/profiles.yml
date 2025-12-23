@@ -10,7 +10,7 @@ automated_intelligence:
       role: SNOWFLAKE_INTELLIGENCE_ADMIN
       warehouse: automated_intelligence_wh
       database: automated_intelligence
-      schema: staging
+      schema: dbt_staging
       threads: 4
       client_session_keep_alive: False
       
@@ -21,6 +21,6 @@ automated_intelligence:
       role: SNOWFLAKE_INTELLIGENCE_ADMIN
       warehouse: automated_intelligence_wh
       database: automated_intelligence
-      schema: analytics
+      schema: dbt_staging
       threads: 4
       client_session_keep_alive: False

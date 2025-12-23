@@ -26,8 +26,8 @@ Ensure the following exist:
 ```sql
 -- Database and schemas
 USE DATABASE automated_intelligence;
-CREATE SCHEMA IF NOT EXISTS staging;
-CREATE SCHEMA IF NOT EXISTS analytics;
+CREATE SCHEMA IF NOT EXISTS dbt_staging;
+CREATE SCHEMA IF NOT EXISTS dbt_analytics;
 
 -- Warehouse
 CREATE WAREHOUSE IF NOT EXISTS automated_intelligence_wh;
@@ -55,13 +55,13 @@ CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION dbt_ext_access
 ### 3. Enable Logging & Monitoring (Recommended)
 ```sql
 -- Enable observability for the schemas
-ALTER SCHEMA automated_intelligence.staging SET LOG_LEVEL = 'INFO';
-ALTER SCHEMA automated_intelligence.staging SET TRACE_LEVEL = 'ALWAYS';
-ALTER SCHEMA automated_intelligence.staging SET METRIC_LEVEL = 'ALL';
+ALTER SCHEMA automated_intelligence.dbt_staging SET LOG_LEVEL = 'INFO';
+ALTER SCHEMA automated_intelligence.dbt_staging SET TRACE_LEVEL = 'ALWAYS';
+ALTER SCHEMA automated_intelligence.dbt_staging SET METRIC_LEVEL = 'ALL';
 
-ALTER SCHEMA automated_intelligence.analytics SET LOG_LEVEL = 'INFO';
-ALTER SCHEMA automated_intelligence.analytics SET TRACE_LEVEL = 'ALWAYS';
-ALTER SCHEMA automated_intelligence.analytics SET METRIC_LEVEL = 'ALL';
+ALTER SCHEMA automated_intelligence.dbt_analytics SET LOG_LEVEL = 'INFO';
+ALTER SCHEMA automated_intelligence.dbt_analytics SET TRACE_LEVEL = 'ALWAYS';
+ALTER SCHEMA automated_intelligence.dbt_analytics SET METRIC_LEVEL = 'ALL';
 ```
 
 ## Deployment Options
@@ -98,25 +98,25 @@ snow dbt execute automated_intelligence_dbt_project \
 
 ```sql
 -- Step 1: Create an internal stage to hold dbt project files
-CREATE OR REPLACE STAGE automated_intelligence.staging.dbt_project_stage;
+CREATE OR REPLACE STAGE automated_intelligence.dbt_staging.dbt_project_stage;
 
 -- Step 2: Upload files to stage (use SnowSQL or Snowflake CLI)
--- PUT file://dbt-analytics/* @automated_intelligence.staging.dbt_project_stage AUTO_COMPRESS=FALSE;
+-- PUT file://dbt-analytics/* @automated_intelligence.dbt_staging.dbt_project_stage AUTO_COMPRESS=FALSE;
 
 -- Step 3: Create the dbt project object
-CREATE OR REPLACE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
-  FROM '@automated_intelligence.staging.dbt_project_stage'
+CREATE OR REPLACE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
+  FROM '@automated_intelligence.dbt_staging.dbt_project_stage'
   DEFAULT_TARGET = 'dev'
   EXTERNAL_ACCESS_INTEGRATIONS = (dbt_ext_access)
   COMMENT = 'Analytical layer with customer, product, and cohort analytics';
 
 -- Step 4: Execute dbt deps
-EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
   ARGS = 'deps'
   EXTERNAL_ACCESS_INTEGRATIONS = (dbt_ext_access);
 
 -- Step 5: Run the project
-EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
   ARGS = 'run --target dev';
 ```
 
@@ -202,12 +202,12 @@ snow dbt execute automated_intelligence_dbt_project \
 
 ```sql
 -- Check created tables
-SHOW TABLES IN SCHEMA automated_intelligence.analytics;
+SHOW TABLES IN SCHEMA automated_intelligence.dbt_analytics;
 
 -- Query results
-SELECT * FROM automated_intelligence.analytics.customer_segmentation LIMIT 10;
-SELECT * FROM automated_intelligence.analytics.customer_lifetime_value LIMIT 10;
-SELECT * FROM automated_intelligence.analytics.product_recommendations LIMIT 10;
+SELECT * FROM automated_intelligence.dbt_analytics.customer_segmentation LIMIT 10;
+SELECT * FROM automated_intelligence.dbt_analytics.customer_lifetime_value LIMIT 10;
+SELECT * FROM automated_intelligence.dbt_analytics.product_recommendations LIMIT 10;
 ```
 
 ## Scheduling & Automation
@@ -216,18 +216,18 @@ SELECT * FROM automated_intelligence.analytics.product_recommendations LIMIT 10;
 
 ```sql
 -- Create a task to run the dbt project daily at 2 AM
-CREATE OR REPLACE TASK automated_intelligence.staging.dbt_daily_refresh
+CREATE OR REPLACE TASK automated_intelligence.dbt_staging.dbt_daily_refresh
   WAREHOUSE = automated_intelligence_wh
   SCHEDULE = 'USING CRON 0 2 * * * America/Los_Angeles'
 AS
-  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+  EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
     ARGS = 'run --target prod';
 
 -- Start the task
-ALTER TASK automated_intelligence.staging.dbt_daily_refresh RESUME;
+ALTER TASK automated_intelligence.dbt_staging.dbt_daily_refresh RESUME;
 
 -- Check task status
-SHOW TASKS LIKE 'dbt_daily_refresh' IN SCHEMA automated_intelligence.staging;
+SHOW TASKS LIKE 'dbt_daily_refresh' IN SCHEMA automated_intelligence.dbt_staging;
 
 -- View task execution history
 SELECT *
@@ -242,34 +242,34 @@ ORDER BY SCHEDULED_TIME DESC;
 
 ```sql
 -- Task 1: Run dbt deps (if packages.yml changes)
-CREATE OR REPLACE TASK automated_intelligence.staging.dbt_deps_task
+CREATE OR REPLACE TASK automated_intelligence.dbt_staging.dbt_deps_task
   WAREHOUSE = automated_intelligence_wh
   SCHEDULE = 'USING CRON 0 1 * * * America/Los_Angeles'
 AS
-  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+  EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
     ARGS = 'deps'
     EXTERNAL_ACCESS_INTEGRATIONS = (dbt_ext_access);
 
 -- Task 2: Run dbt models (depends on deps task)
-CREATE OR REPLACE TASK automated_intelligence.staging.dbt_run_task
+CREATE OR REPLACE TASK automated_intelligence.dbt_staging.dbt_run_task
   WAREHOUSE = automated_intelligence_wh
-  AFTER automated_intelligence.staging.dbt_deps_task
+  AFTER automated_intelligence.dbt_staging.dbt_deps_task
 AS
-  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+  EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
     ARGS = 'run --target prod';
 
 -- Task 3: Run dbt tests (depends on run task)
-CREATE OR REPLACE TASK automated_intelligence.staging.dbt_test_task
+CREATE OR REPLACE TASK automated_intelligence.dbt_staging.dbt_test_task
   WAREHOUSE = automated_intelligence_wh
-  AFTER automated_intelligence.staging.dbt_run_task
+  AFTER automated_intelligence.dbt_staging.dbt_run_task
 AS
-  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+  EXECUTE DBT PROJECT automated_intelligence.dbt_staging.automated_intelligence_dbt_project
     ARGS = 'test --target prod';
 
 -- Resume all tasks (in order)
-ALTER TASK automated_intelligence.staging.dbt_deps_task RESUME;
-ALTER TASK automated_intelligence.staging.dbt_run_task RESUME;
-ALTER TASK automated_intelligence.staging.dbt_test_task RESUME;
+ALTER TASK automated_intelligence.dbt_staging.dbt_deps_task RESUME;
+ALTER TASK automated_intelligence.dbt_staging.dbt_run_task RESUME;
+ALTER TASK automated_intelligence.dbt_staging.dbt_test_task RESUME;
 ```
 
 ## Monitoring
@@ -386,7 +386,7 @@ WHERE run_id IN (
 ### Issue: "Target schema does not exist"
 **Solution:** Create the target schema before deploying:
 ```sql
-CREATE SCHEMA IF NOT EXISTS automated_intelligence.analytics;
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.dbt_analytics;
 ```
 
 ### Issue: "Version conflict"
@@ -399,8 +399,8 @@ snow dbt deploy automated_intelligence_dbt_project --force
 **Solution:** Ensure the role has necessary privileges:
 ```sql
 GRANT USAGE ON DATABASE automated_intelligence TO ROLE snowflake_intelligence_admin;
-GRANT USAGE ON SCHEMA automated_intelligence.staging TO ROLE snowflake_intelligence_admin;
-GRANT CREATE TABLE ON SCHEMA automated_intelligence.analytics TO ROLE snowflake_intelligence_admin;
+GRANT USAGE ON SCHEMA automated_intelligence.dbt_staging TO ROLE snowflake_intelligence_admin;
+GRANT CREATE TABLE ON SCHEMA automated_intelligence.dbt_analytics TO ROLE snowflake_intelligence_admin;
 GRANT USAGE ON WAREHOUSE automated_intelligence_wh TO ROLE snowflake_intelligence_admin;
 ```
 
