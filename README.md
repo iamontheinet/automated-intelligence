@@ -71,45 +71,54 @@ All demos share the same foundation and work together to show an end-to-end plat
 
 ## 🚀 Quick Start - One-Time Setup
 
-Run these setup scripts **once** to prepare all demo components:
+### Core Setup (Required for All Demos)
+
+Run these scripts **once** to set up shared infrastructure:
 
 ```bash
-# 1. Base setup (database, tables, dynamic tables)
+# 1. Core infrastructure (database, schemas, warehouse, tables, dynamic tables)
 snow sql -f setup/setup.sql -c dash-builder-si
 
-# 2. Gen2 staging pipeline setup (NEW!)
-snow sql -f sql/setup_staging_pipeline.sql -c dash-builder-si
-snow sql -f sql/setup_merge_procedures.sql -c dash-builder-si
+# 2. Cortex Search for product discovery
+snow sql -f setup/create_cortex_search.sql -c dash-builder-si
 
-# 3. Snowflake Intelligence setup (NEW! - Enhanced semantic model + agent)
-# First create the stage and upload YAML
+# 3. Semantic model and Cortex Agent (optional - for AI/NL queries)
 snow sql -f setup/create_semantic_model_stage.sql -c dash-builder-si
 snow stage copy setup/business_insights_semantic_model.yaml @automated_intelligence.raw.semantic_models/ --overwrite -c dash-builder-si
-
-# Then create Cortex Search and Agent
-snow sql -f setup/create_cortex_search.sql -c dash-builder-si
 snow sql -f setup/create_agent.sql -c dash-builder-si
-
-# 4. Interactive tables setup
-snow sql -f interactive/setup_interactive.sql -c dash-builder-si
-
-# 5. Security setup (RBAC)
-snow sql -f security-and-governance/setup_west_coast_manager.sql -c dash-builder-si
-
-# 6. Snowpipe streaming setup (Java)
-snow sql -f snowpipe-streaming-java/setup_pipes.sql -c dash-builder-si
-
-# 7. Python virtual environment for interactive demos
-cd interactive
-python3 -m venv venv
-source venv/bin/activate
-pip install snowflake-connector-python
-cd ..
 ```
 
-**Note:** Snowpipe Streaming also requires RSA key generation, profile.json configuration, and SDK setup. See respective README files for details.
+### Component-Specific Setup (Run Only What You Need)
 
-**After setup, all demos are ready to run in any order!**
+Each demo has its own setup. Run only the ones you plan to use:
+
+```bash
+# Demo 1: Gen2 Warehouse Performance
+snow sql -f sql/setup_staging_pipeline.sql -c dash-builder-si
+snow sql -f sql/setup_merge_procedures.sql -c dash-builder-si
+# See sql/README.md for details
+
+# Demo 2: Dynamic Tables
+# (No additional setup - covered by core setup.sql)
+
+# Demo 3: Interactive Tables
+snow sql -f interactive/setup_interactive.sql -c dash-builder-si
+# See interactive/README.md for details
+
+# Demo 4: Snowpipe Streaming
+# Requires RSA key generation and SDK setup
+# See snowpipe-streaming-java/README.md or snowpipe-streaming-python/README.md
+
+# Demo 5: Security & Governance
+snow sql -f security-and-governance/setup_west_coast_manager.sql -c dash-builder-si
+# See security-and-governance/README.md for details
+
+# Demo 6: Streamlit Dashboard
+cd streamlit-dashboard
+# See streamlit-dashboard/README.md for Python environment setup
+```
+
+**After core setup, pick the demos you want and run their specific setup scripts!**
 
 ---
 
@@ -487,67 +496,86 @@ python evaluate_order_analytics.py
 
 ```
 automated-intelligence/
-├── setup/                      # One-time setup scripts
-│   ├── setup.sql               # Database, tables, dynamic tables, semantic schema
-│   ├── create_semantic_view.sql      # NEW: Enhanced semantic view with VQR
-│   ├── create_agent.sql              # NEW: Enhanced Cortex Agent
-│   └── create_cortex_search.sql      # NEW: Product search service
+├── setup/                      # Core shared setup (required for all demos)
+│   ├── setup.sql               # Database, schemas, warehouse, raw tables, dynamic tables
+│   ├── create_semantic_model_stage.sql  # Stage for semantic model YAML
+│   ├── create_agent.sql        # Cortex Agent for natural language queries
+│   ├── create_cortex_search.sql # Cortex Search for product discovery
+│   └── business_insights_semantic_model.yaml  # Semantic model definition
 │
-├── sql/                        # Gen2 warehouse setup (NEW!)
-│   ├── setup_staging_pipeline.sql    # Staging schema, tables, pipes, Gen2 WH
-│   └── setup_merge_procedures.sql    # MERGE/UPDATE procedures with benchmarking
+├── sql/                        # Demo 1: Gen2 Warehouse (component-specific setup)
+│   ├── setup_staging_pipeline.sql    # Staging schema, tables, Gen2 WH
+│   ├── setup_merge_procedures.sql    # MERGE/UPDATE procedures with benchmarking
+│   └── README.md               # Gen2 setup and demo instructions
 │
-├── interactive/                # Demo 3: Interactive Tables
+├── interactive/                # Demo 3: Interactive Tables (component-specific setup)
+│   ├── setup_interactive.sql   # Interactive tables and warehouse
 │   ├── demo.sh                 # Main demo script
 │   ├── load_test_interactive.py
 │   ├── realtime_demo.py
-│   ├── setup_interactive.sql
 │   └── README.md
 │
-├── snowpipe-streaming-python/  # Demo 4: Python implementation
+├── snowpipe-streaming-python/  # Demo 4: Python implementation (component-specific setup)
 │   ├── src/
 │   │   ├── automated_intelligence_streaming.py
 │   │   ├── parallel_streaming_orchestrator.py
 │   │   ├── models.py
-│   │   ├── data_generator.py
-│   │   └── ...
-│   ├── config_staging.properties      # NEW: Staging target config
-│   ├── profile_staging.json           # NEW: Staging schema
+│   │   └── data_generator.py
+│   ├── config_staging.properties      # Staging target config
+│   ├── profile_staging.json           # Staging schema profile
 │   ├── requirements.txt
-│   ├── README.md
-│   └── COMPARISON.md
+│   └── README.md               # SDK setup and configuration instructions
 │
-├── snowpipe-streaming-java/    # Demo 4: Java implementation
+├── snowpipe-streaming-java/    # Demo 4: Java implementation (component-specific setup)
 │   ├── src/
 │   ├── pom.xml
-│   └── README.md
+│   └── README.md               # SDK setup and configuration instructions
 │
-├── security-and-governance/    # Demo 5: RBAC
+├── security-and-governance/    # Demo 5: RBAC (component-specific setup)
 │   ├── setup_west_coast_manager.sql
+│   ├── cleanup_west_coast_manager.sql
 │   └── README.md
 │
-├── streamlit-dashboard/        # Demo 6: Real-time monitoring
+├── streamlit-dashboard/        # Demo 6: Real-time monitoring (component-specific setup)
 │   ├── streamlit_app.py        # Main dashboard app
 │   ├── pages/
-│   │   ├── 1_data_pipeline.py  # NEW: Gen2 warehouse performance page
+│   │   ├── 1_data_pipeline.py  # Gen2 warehouse performance page
 │   │   ├── 2_live_ingestion.py
 │   │   ├── 3_pipeline_health.py
 │   │   ├── 4_query_performance.py
 │   │   ├── 5_ml_insights.py
 │   │   └── 6_summary.py
 │   ├── environment.yml         # Snowflake dependencies
-│   ├── .streamlit/
-│   │   └── secrets.toml        # Connection config
-│   └── README.md
+│   └── README.md               # Streamlit setup and deployment
 │
 ├── agent-evaluation/           # Optional: AI Observability
 │   ├── evaluate_order_analytics.py
 │   └── README.md
 │
-├── GEN2_QUICK_REFERENCE.md     # NEW: Quick reference for Gen2 demo
-├── GEN2_SETUP_GUIDE.md         # NEW: Detailed Gen2 setup guide
-├── README.md                   # This file - Overview
-└── DEMO_SCRIPT.md             # Complete demo guide with talking points
+├── openflow-ingestion/         # Experimental: Openflow → Iceberg (untested)
+│   └── README.md               # ⚠️ Reference implementation only
+│
+├── examples/                   # Example notebooks and scripts
+│   ├── ai_functions_examples.sql
+│   ├── ai_functions_notebook.ipynb
+│   └── Dash_AI_DT.ipynb
+│
+├── tests/                      # Test scripts
+│   ├── test_data_quality.sql
+│   └── test_data_quality.ipynb
+│
+├── maintenance/                # Maintenance and migration scripts
+│   ├── reset_tables.sql
+│   ├── migrate_to_uuid.sql
+│   ├── fix_dynamic_table_lags.sql
+│   └── set_realtime_lag.sql
+│
+├── docs/                       # Additional documentation
+│   ├── DYNAMIC_TABLE_CONFIGURATION.md
+│   └── DYNAMIC_TABLE_LAG_FIX.md
+│
+├── README.md                   # This file - Overview and quick start
+└── demo_script.md              # Complete demo guide with talking points
 ```
 
 ---
