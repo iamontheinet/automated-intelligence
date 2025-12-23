@@ -10,7 +10,7 @@ automated_intelligence:
       role: SNOWFLAKE_INTELLIGENCE_ADMIN
       warehouse: automated_intelligence_wh
       database: automated_intelligence
-      schema: dbt_staging
+      schema: staging  # Base schema (will be overridden by custom_schema in models)
       threads: 4
       client_session_keep_alive: False
       
@@ -21,6 +21,6 @@ automated_intelligence:
       role: SNOWFLAKE_INTELLIGENCE_ADMIN
       warehouse: automated_intelligence_wh
       database: automated_intelligence
-      schema: dbt_staging
+      schema: staging  # Base schema (will be overridden by custom_schema in models)
       threads: 4
       client_session_keep_alive: False
