@@ -501,7 +501,21 @@ automated-intelligence/
 │   ├── create_semantic_model_stage.sql  # Stage for semantic model YAML
 │   ├── create_agent.sql        # Cortex Agent for natural language queries
 │   ├── create_cortex_search.sql # Cortex Search for product discovery
-│   └── business_insights_semantic_model.yaml  # Semantic model definition
+│   ├── business_insights_semantic_model.yaml  # Semantic model definition
+│   ├── README.md               # Setup instructions and verification
+│   ├── examples/               # Tutorials and example scripts
+│   │   ├── ai_functions_examples.sql    # AI functions (sentiment, completion, etc.)
+│   │   ├── ai_functions_notebook.ipynb  # Interactive AI functions tutorial
+│   │   ├── Dash_AI_DT.ipynb             # Dynamic Tables deep dive tutorial
+│   │   ├── test_data_quality.sql        # Data quality validation
+│   │   └── test_data_quality.ipynb      # Interactive DQ notebook
+│   └── docs/                   # Reference docs and maintenance scripts
+│       ├── DYNAMIC_TABLE_CONFIGURATION.md   # DT configuration reference
+│       ├── DYNAMIC_TABLE_LAG_FIX.md         # DT troubleshooting guide
+│       ├── fix_dynamic_table_lags.sql       # Fix DT lag settings
+│       ├── set_realtime_lag.sql             # Configure real-time lag
+│       ├── reset_tables.sql                 # Reset data for fresh start
+│       └── migrate_to_uuid.sql              # Historical migration script
 │
 ├── sql/                        # Demo 1: Gen2 Warehouse (component-specific setup)
 │   ├── setup_staging_pipeline.sql    # Staging schema, tables, Gen2 WH
@@ -554,25 +568,6 @@ automated-intelligence/
 │
 ├── openflow-ingestion/         # Experimental: Openflow → Iceberg (untested)
 │   └── README.md               # ⚠️ Reference implementation only
-│
-├── examples/                   # Example notebooks and scripts
-│   ├── ai_functions_examples.sql
-│   ├── ai_functions_notebook.ipynb
-│   └── Dash_AI_DT.ipynb
-│
-├── tests/                      # Test scripts
-│   ├── test_data_quality.sql
-│   └── test_data_quality.ipynb
-│
-├── maintenance/                # Maintenance and migration scripts
-│   ├── reset_tables.sql
-│   ├── migrate_to_uuid.sql
-│   ├── fix_dynamic_table_lags.sql
-│   └── set_realtime_lag.sql
-│
-├── docs/                       # Additional documentation
-│   ├── DYNAMIC_TABLE_CONFIGURATION.md
-│   └── DYNAMIC_TABLE_LAG_FIX.md
 │
 ├── README.md                   # This file - Overview and quick start
 └── demo_script.md              # Complete demo guide with talking points
