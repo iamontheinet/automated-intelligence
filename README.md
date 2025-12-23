@@ -80,6 +80,20 @@ Run these scripts **once** to set up shared infrastructure:
 snow sql -f setup.sql -c dash-builder-si
 ```
 
+### Optional: Analytical Layer Setup (DBT)
+
+For batch analytical models (CLV, segmentation, cohorts):
+
+```bash
+cd dbt-analytics
+pip install dbt-snowflake
+dbt deps
+dbt debug  # Test connection
+dbt build  # Build all models
+```
+
+See `dbt-analytics/README.md` for detailed setup and usage.
+
 ### Optional: Snowflake Intelligence Setup
 
 See `snowflake-intelligence/README.md` for Cortex Agent, Cortex Search, and semantic model setup.
@@ -499,6 +513,17 @@ automated-intelligence/
 │   ├── test_dynamic_tables.ipynb    # Dynamic Tables deep dive tutorial
 │   ├── test_data_quality.sql        # Data quality validation
 │   └── test_data_quality.ipynb      # Interactive DQ notebook
+│
+├── dbt-analytics/              # DBT analytical layer (batch processing)
+│   ├── dbt_project.yml         # DBT project configuration
+│   ├── profiles.yml            # Connection profile (uses env vars)
+│   ├── models/
+│   │   ├── staging/            # Staging views (stg_customers, stg_orders, etc.)
+│   │   └── marts/              # Analytical marts
+│   │       ├── customer/       # CLV, segmentation
+│   │       ├── product/        # Affinity, recommendations
+│   │       └── cohort/         # Retention analysis
+│   └── README.md               # DBT setup and usage guide
 │
 ├── snowflake-intelligence/     # Demo 2: Cortex AI & Analyst (component-specific setup)
 │   ├── business_insights_semantic_model.yaml  # Semantic model definition

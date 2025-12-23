@@ -41,6 +41,12 @@ python3 -m venv venv
 source venv/bin/activate
 pip install snowflake-connector-python
 cd ..
+
+# 6. (Optional) DBT analytical layer
+cd dbt-analytics
+pip install dbt-snowflake
+dbt deps && dbt build
+cd ..
 ```
 
 **Note:** Snowpipe Streaming requires additional setup:
