@@ -5,8 +5,7 @@ This directory contains example notebooks and SQL scripts demonstrating features
 ## Files
 
 ### AI Functions Examples
-- `ai_functions_examples.sql` - SQL examples of Cortex AI functions (sentiment, aggregation, completion, extraction)
-- `ai_functions_notebook.ipynb` - Interactive Jupyter notebook demonstrating AI functions
+- `ai_functions_notebook.ipynb` - Interactive notebook demonstrating Cortex AI functions
 
 **Uses tables:** `product_reviews`, `support_tickets`, `product_catalog` (all created in `setup.sql`)
 
@@ -43,9 +42,6 @@ This directory contains example notebooks and SQL scripts demonstrating features
 
 ### Run SQL Examples
 ```bash
-# AI functions examples
-snow sql -f setup/examples/ai_functions_examples.sql -c dash-builder-si
-
 # Data quality tests
 snow sql -f setup/examples/test_data_quality.sql -c dash-builder-si
 ```
