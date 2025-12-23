@@ -15,8 +15,8 @@ Sets up the staging pipeline and MERGE procedures needed to demonstrate Gen2 war
 
 ```bash
 # Run both scripts in order
-snow sql -f sql/setup_staging_pipeline.sql -c dash-builder-si
-snow sql -f sql/setup_merge_procedures.sql -c dash-builder-si
+snow sql -f gen2-warehouse/setup_staging_pipeline.sql -c dash-builder-si
+snow sql -f gen2-warehouse/setup_merge_procedures.sql -c dash-builder-si
 ```
 
 ## Prerequisites

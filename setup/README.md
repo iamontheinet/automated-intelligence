@@ -81,7 +81,7 @@ automated_intelligence
 
 After running core setup, each demo may have additional setup requirements:
 
-- **Demo 1 (Gen2 Warehouse)**: See `/sql/README.md`
+- **Demo 1 (Gen2 Warehouse)**: See `/gen2-warehouse/README.md`
 - **Demo 3 (Interactive Tables)**: See `/interactive/README.md`
 - **Demo 4 (Snowpipe Streaming)**: See component README files
 - **Demo 5 (Security/RBAC)**: See `/security-and-governance/README.md`
