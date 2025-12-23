@@ -113,4 +113,14 @@ If setup fails:
 2. Verify warehouse `automated_intelligence_wh` can be created/accessed
 3. Check for naming conflicts with existing objects
 
-See `/docs` for additional troubleshooting guides.
+## Additional Resources
+
+- **Examples & Tutorials**: See `setup/examples/README.md` for:
+  - AI functions demonstrations (sentiment, completion, extraction)
+  - Dynamic Tables deep dive tutorial
+  - Data quality testing scripts
+  
+- **Configuration & Maintenance**: See `setup/docs/README.md` for:
+  - Dynamic Tables configuration reference
+  - Troubleshooting guides
+  - Maintenance scripts
