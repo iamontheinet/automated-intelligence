@@ -93,13 +93,31 @@ vars:
 ## Setup
 
 ### Prerequisites
-1. dbt Core installed (`pip install dbt-snowflake`)
-2. Snowflake connection configured
+1. Snowflake account with necessary privileges
+2. Database and schemas created (`staging`, `analytics`)
 3. Raw data tables populated in `automated_intelligence.raw` schema
+4. Snowflake CLI installed (for deployment) - [Installation Guide](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index)
 
-### Installation
+### Deployment Options
+
+This dbt project follows [dbt Projects on Snowflake](https://docs.snowflake.com/en/user-guide/data-engineering/dbt-projects-on-snowflake) best practices and can be deployed as a **DBT PROJECT** object in Snowflake.
+
+**See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive deployment guide with:**
+- Snowflake CLI deployment (recommended)
+- SQL-based deployment
+- Snowsight workspace deployment
+- Scheduling with Snowflake tasks
+- Monitoring and observability
+
+### Quick Start (Local Development)
+
+For local development and testing:
+
 ```bash
 cd dbt-analytics
+
+# Install dbt-snowflake (if not already installed)
+pip install dbt-snowflake
 
 # Install dependencies
 dbt deps
@@ -108,25 +126,51 @@ dbt deps
 dbt debug
 
 # Run models
-dbt run
+dbt run --target dev
 
 # Run tests
 dbt test
 ```
 
+### Quick Start (Snowflake Native Deployment)
+
+Deploy as a native Snowflake object:
+
+```bash
+cd dbt-analytics
+
+# Deploy the dbt project object
+snow dbt deploy automated_intelligence_dbt_project \
+  --connection dash-builder-si \
+  --force
+
+# Install dependencies
+snow dbt execute automated_intelligence_dbt_project \
+  --connection dash-builder-si \
+  --args "deps" \
+  --external-access-integration dbt_ext_access
+
+# Run the project
+snow dbt execute automated_intelligence_dbt_project \
+  --connection dash-builder-si \
+  --args "build --target dev"
+```
+
 ### Initial Build
 ```bash
-# Build everything
+# Build everything (local)
 dbt build
 
-# Build specific models
+# Build specific models (local)
 dbt run --select stg_customers
 dbt run --select customer_lifetime_value+
 
-# Build by tag
+# Build by tag (local)
 dbt run --select tag:customer
 dbt run --select tag:product
 ```
+
+For production deployment to Snowflake, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ## Usage
 
@@ -204,20 +248,24 @@ dbt test --select source:*
 
 ## Scheduling
 
-### Production Deployment
-Run dbt models on a schedule (e.g., daily at 2 AM):
+### Local/Traditional Deployment
+See [DEPLOYMENT.md](DEPLOYMENT.md#scheduling--automation) for comprehensive scheduling options.
 
-**Option 1: Snowflake Tasks**
+### Production Deployment with Snowflake Tasks
+
+**Option 1: Simple Daily Refresh**
 ```sql
-CREATE TASK automated_intelligence.analytics.dbt_daily_refresh
+CREATE OR REPLACE TASK automated_intelligence.staging.dbt_daily_refresh
   WAREHOUSE = automated_intelligence_wh
   SCHEDULE = 'USING CRON 0 2 * * * America/Los_Angeles'
 AS
-  -- Execute via external function or stored proc
-  CALL system$run_dbt_job('<job_id>');
+  EXECUTE DBT PROJECT automated_intelligence.staging.automated_intelligence_dbt_project
+    ARGS = 'run --target prod';
+
+ALTER TASK automated_intelligence.staging.dbt_daily_refresh RESUME;
 ```
 
-**Option 2: Airflow/Orchestration**
+**Option 2: Orchestration Tool (Airflow/etc.)**
 ```python
 from airflow.operators.bash import BashOperator
 
