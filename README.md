@@ -511,7 +511,7 @@ automated-intelligence/
 │   └── docs/                   # Reference documentation
 │       └── DYNAMIC_TABLE_CONFIGURATION.md   # DT configuration reference
 │
-├── sql/                        # Demo 1: Gen2 Warehouse (component-specific setup)
+├── gen2-warehouse/             # Demo 1: Gen2 Warehouse (component-specific setup)
 │   ├── setup_staging_pipeline.sql    # Staging schema, tables, Gen2 WH
 │   ├── setup_merge_procedures.sql    # MERGE/UPDATE procedures with benchmarking
 │   └── README.md               # Gen2 setup and demo instructions
