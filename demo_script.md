@@ -189,17 +189,16 @@ LIMIT 5;
 
 ### Step 6: Insert New Orders Using Stored Procedure
 ```sql
--- Generate 500 new orders with referential integrity
-CALL automated_intelligence.raw.generate_orders(500);
+-- ⚠️ generate_orders() procedure removed
+-- Use Snowpipe Streaming to generate orders
+-- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
+
+-- For demo purposes: check existing orders
+SELECT COUNT(*) FROM automated_intelligence.raw.orders;
 ```
 
 **What to say**: 
-> "Now I'm inserting 500 new orders using our stored procedure. This simulates real-world data arriving in our system. The procedure automatically creates order items (1-10 per order) with referential integrity to existing customers."
-
-**Expected output**: 
-```
-Successfully inserted 500 orders and [X] order items
-```
+> "The generate_orders stored procedure has been removed. In production, we now use Snowpipe Streaming for realistic continuous order ingestion. For this demo, we'll work with existing orders in the system, or you can run the Snowpipe Streaming application to generate new data in real-time."
 
 ### Step 7: Verify New Data in Raw Tables
 ```sql
@@ -808,8 +807,8 @@ DROP ROLE IF EXISTS west_coast_manager;
 Or keep the structure and just add more data:
 
 ```sql
--- Add another batch for follow-up demos
-CALL automated_intelligence.raw.generate_orders(1000);
+-- Add more orders via Snowpipe Streaming
+-- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
 ```
 
 ---

@@ -2,6 +2,7 @@
 -- Automated Intelligence - Complete Setup Script
 -- 
 -- Execution Order:
+--   0. Clean up existing objects (WIPE SLATE)
 --   1. Setup database, schemas, and warehouse
 --   2. Create raw tables (customers, orders, order_items)
 --   3. Create stored procedures for data generation
@@ -13,16 +14,117 @@
 USE ROLE SNOWFLAKE_INTELLIGENCE_ADMIN;
 
 -- ============================================================================
+-- STEP 0: WIPE SLATE - Drop all existing objects
+-- ============================================================================
+
+-- Create database if not exists (needed for context)
+CREATE DATABASE IF NOT EXISTS automated_intelligence;
+USE DATABASE automated_intelligence;
+
+-- Drop alerts first (dependencies on views/tables)
+DROP ALERT IF EXISTS raw.data_quality_alert;
+
+-- Drop Cortex Search Services
+DROP CORTEX SEARCH SERVICE IF EXISTS raw.product_search_service;
+
+-- Drop views (before tables they depend on)
+-- Note: Some schemas may not exist yet, which is fine
+DROP VIEW IF EXISTS raw.vw_dq_monitoring_results;
+-- Skip views in schemas that may not exist (they'll be dropped with CASCADE)
+-- DROP VIEW IF EXISTS analytics_iceberg.ingestion_stats;
+-- DROP VIEW IF EXISTS dbt_staging.stg_customers;
+-- DROP VIEW IF EXISTS dbt_staging.stg_orders;
+-- DROP VIEW IF EXISTS dbt_staging.stg_order_items;
+-- DROP VIEW IF EXISTS dbt_staging.stg_products;
+
+-- Drop dynamic tables (in reverse dependency order)
+DROP DYNAMIC TABLE IF EXISTS dynamic_tables.product_performance_metrics;
+DROP DYNAMIC TABLE IF EXISTS dynamic_tables.daily_business_metrics;
+DROP DYNAMIC TABLE IF EXISTS dynamic_tables.fact_orders;
+DROP DYNAMIC TABLE IF EXISTS dynamic_tables.enriched_order_items;
+DROP DYNAMIC TABLE IF EXISTS dynamic_tables.enriched_orders;
+
+-- Drop tables in schemas that may not exist (they'll be dropped with CASCADE)
+-- DROP TABLE IF EXISTS interactive.customer_order_analytics;
+-- DROP TABLE IF EXISTS interactive.order_lookup;
+
+-- Drop base tables in all schemas
+DROP TABLE IF EXISTS raw.trulens_records;
+DROP TABLE IF EXISTS raw.trulens_ground_truth;
+DROP TABLE IF EXISTS raw.trulens_feedback_defs;
+DROP TABLE IF EXISTS raw.trulens_feedbacks;
+DROP TABLE IF EXISTS raw.trulens_dataset;
+DROP TABLE IF EXISTS raw.trulens_apps;
+DROP TABLE IF EXISTS raw.trulens_alembic_version;
+DROP TABLE IF EXISTS raw.support_tickets;
+DROP TABLE IF EXISTS raw.product_reviews;
+DROP TABLE IF EXISTS raw.product_performance_metrics;
+DROP TABLE IF EXISTS raw.product_catalog;
+DROP TABLE IF EXISTS raw.order_items_backup;
+DROP TABLE IF EXISTS raw.order_items;
+DROP TABLE IF EXISTS raw.orders_backup;
+DROP TABLE IF EXISTS raw.orders;
+DROP TABLE IF EXISTS raw.fact_orders;
+DROP TABLE IF EXISTS raw.enriched_order_items;
+DROP TABLE IF EXISTS raw.enriched_orders;
+DROP TABLE IF EXISTS raw.daily_business_metrics;
+DROP TABLE IF EXISTS raw.data_quality_alerts;
+DROP TABLE IF EXISTS raw.customers;
+
+DROP TABLE IF EXISTS staging.order_items_staging;
+DROP TABLE IF EXISTS staging.orders_staging;
+DROP TABLE IF EXISTS staging.discount_snapshot;
+
+-- Drop tables in schemas that may not exist (they'll be dropped with CASCADE)
+-- DROP TABLE IF EXISTS dbt_analytics.product_recommendations;
+-- DROP TABLE IF EXISTS dbt_analytics.product_affinity;
+-- DROP TABLE IF EXISTS dbt_analytics.monthly_cohorts;
+-- DROP TABLE IF EXISTS dbt_analytics.customer_segmentation;
+-- DROP TABLE IF EXISTS dbt_analytics.customer_lifetime_value;
+
+-- Note: Iceberg tables require external volume privileges to drop
+-- Skipping these - they will be recreated if needed or can be dropped manually with ACCOUNTADMIN
+-- DROP TABLE IF EXISTS analytics_iceberg.order_items;
+-- DROP TABLE IF EXISTS analytics_iceberg.orders;
+
+-- Drop stored procedures
+DROP PROCEDURE IF EXISTS raw.generate_orders(INT);
+DROP PROCEDURE IF EXISTS raw.generate_customers(INT);
+DROP PROCEDURE IF EXISTS staging.merge_staging_to_raw(BOOLEAN);
+DROP PROCEDURE IF EXISTS staging.merge_staging_to_raw(VARCHAR, BOOLEAN);
+DROP PROCEDURE IF EXISTS staging.enrich_raw_data(BOOLEAN);
+DROP PROCEDURE IF EXISTS staging.enrich_raw_data(VARCHAR, BOOLEAN);
+DROP PROCEDURE IF EXISTS staging.create_discount_snapshot();
+DROP PROCEDURE IF EXISTS staging.restore_discount_snapshot();
+DROP PROCEDURE IF EXISTS staging.truncate_staging_tables();
+DROP PROCEDURE IF EXISTS staging.get_staging_counts();
+
+-- Drop schemas (except INFORMATION_SCHEMA which is system-managed)
+-- Note: analytics_iceberg schema may require ACCOUNTADMIN to drop due to external volume dependencies
+-- DROP SCHEMA IF EXISTS analytics_iceberg CASCADE;
+DROP SCHEMA IF EXISTS models CASCADE;
+DROP SCHEMA IF EXISTS dbt_analytics CASCADE;
+DROP SCHEMA IF EXISTS dbt_staging CASCADE;
+DROP SCHEMA IF EXISTS dynamic_tables CASCADE;
+DROP SCHEMA IF EXISTS interactive CASCADE;
+DROP SCHEMA IF EXISTS staging CASCADE;
+DROP SCHEMA IF EXISTS semantic CASCADE;
+DROP SCHEMA IF EXISTS raw CASCADE;
+
+-- ============================================================================
 -- STEP 1: Setup Database, Schemas, and Warehouse
 -- ============================================================================
 
--- Create database
+-- Create database (already exists from step 0)
 CREATE DATABASE IF NOT EXISTS automated_intelligence;
 
 -- Create schemas
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.raw;
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.staging;
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.dynamic_tables;
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.interactive;
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.semantic;
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.models COMMENT = 'Schema for ML models registered via Snowflake Model Registry';
 
 -- Create warehouse
 CREATE WAREHOUSE IF NOT EXISTS automated_intelligence_wh
@@ -86,19 +188,17 @@ CREATE OR REPLACE TABLE order_items (
 -- STEP 3: Create Stored Procedures
 -- ============================================================================
 
--- Procedure: generate_orders
--- Purpose: Generate customers, orders, reviews, and support tickets for demo
--- Parameters: num_orders - Number of new orders to create
-CREATE OR REPLACE PROCEDURE generate_orders(num_orders INT)
+-- Procedure: generate_customers
+-- Purpose: Generate customer records independently
+-- Parameters: num_customers - Number of new customers to create
+CREATE OR REPLACE PROCEDURE generate_customers(num_customers INT)
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
-    -- Get the next customer_id
     LET next_customer_id INT := (SELECT COALESCE(MAX(customer_id), 0) + 1 FROM customers);
     
-    -- Insert new customers
     INSERT INTO customers
     SELECT
         :next_customer_id + ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS customer_id,
@@ -143,13 +243,44 @@ BEGIN
             WHEN 2 THEN 'Standard'
             ELSE 'Basic'
         END AS customer_segment
-    FROM TABLE(GENERATOR(ROWCOUNT => :num_orders));
+    FROM TABLE(GENERATOR(ROWCOUNT => :num_customers));
     
-    -- Insert new orders (one per customer) with UUID order_id
+    RETURN 'Successfully generated ' || :num_customers || ' customers';
+END;
+$$;
+
+-- Procedure: generate_orders
+-- Purpose: Generate orders, order items, reviews, and support tickets from existing customers
+-- Parameters: num_orders - Number of new orders to create
+-- Note: Requires existing customers - run generate_customers() first if needed
+CREATE OR REPLACE PROCEDURE generate_orders(num_orders INT)
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+    LET customer_count INT := (SELECT COUNT(*) FROM customers);
+    
+    IF (:customer_count = 0) THEN
+        RETURN 'Error: No customers exist. Please run generate_customers() first.';
+    END IF;
+    
+    -- Generate orders with random customer assignment
+    -- Use HASH on GENERATOR sequence for true random distribution across customers
     INSERT INTO orders
+    WITH numbered_customers AS (
+        SELECT customer_id, ROW_NUMBER() OVER (ORDER BY customer_id) as rn
+        FROM customers
+    ),
+    order_gen AS (
+        SELECT 
+            SEQ4() as seq,
+            MOD(ABS(HASH(SEQ4())), :customer_count) + 1 as customer_rn
+        FROM TABLE(GENERATOR(ROWCOUNT => :num_orders))
+    )
     SELECT
         UUID_STRING() AS order_id,
-        :next_customer_id + ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS customer_id,
+        nc.customer_id,
         DATEADD(day, -UNIFORM(1, 365, RANDOM()), CURRENT_TIMESTAMP()) AS order_date,
         CASE UNIFORM(1, 5, RANDOM())
             WHEN 1 THEN 'Completed'
@@ -161,12 +292,11 @@ BEGIN
         ROUND(UNIFORM(10, 5000, RANDOM()), 2) AS total_amount,
         CASE WHEN UNIFORM(1, 10, RANDOM()) > 7 THEN UNIFORM(5, 25, RANDOM()) ELSE 0 END AS discount_percent,
         ROUND(UNIFORM(5, 50, RANDOM()), 2) AS shipping_cost
-    FROM TABLE(GENERATOR(ROWCOUNT => :num_orders));
+    FROM order_gen og
+    JOIN numbered_customers nc ON og.customer_rn = nc.rn;
     
-    -- Insert order items (1-10 items per new order) with UUID order_item_id
     INSERT INTO order_items
     WITH new_orders AS (
-        -- Get the most recent orders (last num_orders)
         SELECT order_id, order_date
         FROM orders
         ORDER BY order_date DESC
@@ -213,7 +343,6 @@ BEGIN
     CROSS JOIN product_mapping pm
     WHERE pm.product_num = UNIFORM(1, 10, RANDOM());
     
-    -- Insert product reviews (10% of customers leave reviews for products they actually purchased)
     INSERT INTO product_reviews (product_id, customer_id, review_date, rating, review_title, review_text, verified_purchase)
     SELECT
         oi.product_id,
@@ -234,13 +363,16 @@ BEGIN
         END AS review_title,
         'I recently purchased this product and have been using it extensively over the past few weeks. Overall, I am quite satisfied with my purchase. The build quality is solid and the materials feel premium. Performance has been consistent across various conditions. The product arrived well packaged and exactly as described on the website. Setup was straightforward and I was able to start using it immediately without any complications. The attention to detail in the design is evident and shows that the manufacturer cares about creating a quality product. I particularly appreciate how well it performs in challenging conditions. The ergonomics are well thought out and it feels comfortable during extended use. After several weeks of regular use, I have noticed no significant wear or degradation in performance. The product maintains its original quality and continues to meet my expectations. Customer service was responsive when I had questions before purchasing. Shipping was prompt and the item arrived within the estimated delivery window. The price point is reasonable considering the quality and features offered. I have recommended this product to friends who were looking for similar equipment. While no product is perfect, this one comes close to meeting all my needs. There are minor areas where improvements could be made, but they do not significantly impact the overall experience. The functionality is solid and reliable. I feel confident that this product will continue to perform well over time. For anyone considering this purchase, I would say it is worth the investment if it matches your specific requirements and use case. Do your research and make sure it aligns with what you are looking for, but if it does, you will likely be pleased with the purchase.' AS review_text,
         TRUE AS verified_purchase
-    FROM orders o
+    FROM (
+        SELECT order_id, customer_id, order_date, order_status
+        FROM orders
+        ORDER BY order_date DESC
+        LIMIT :num_orders
+    ) o
     INNER JOIN order_items oi ON o.order_id = oi.order_id
-    WHERE o.order_id >= :next_order_id
-        AND o.order_status = 'Completed'
+    WHERE o.order_status = 'Completed'
         AND UNIFORM(1, 10, RANDOM()) = 1;
     
-    -- Insert support tickets (5% of customers create tickets)
     INSERT INTO support_tickets (customer_id, ticket_date, category, priority, subject, description, resolution, status)
     SELECT
         customer_id,
@@ -280,16 +412,292 @@ BEGIN
             WHEN 2 THEN 'Open'
             ELSE 'Pending'
         END AS status
-    FROM orders
-    WHERE order_id >= :next_order_id
-        AND UNIFORM(1, 20, RANDOM()) = 1;
+    FROM (
+        SELECT order_id, customer_id, order_date
+        FROM orders
+        ORDER BY order_date DESC
+        LIMIT :num_orders
+    )
+    WHERE UNIFORM(1, 20, RANDOM()) = 1;
     
-    RETURN 'Successfully generated ' || :num_orders || ' orders with customers, reviews, and support tickets';
+    RETURN 'Successfully generated ' || :num_orders || ' orders with order items, reviews, and support tickets';
 END;
 $$;
 
--- Verify procedure created
-SHOW PROCEDURES LIKE 'generate_orders';
+-- Verify procedures created
+SHOW PROCEDURES LIKE '%generate%';
+
+
+-- ============================================================================
+-- STEP 3.5: Create Staging Tables and Procedures
+-- ============================================================================
+
+USE SCHEMA automated_intelligence.staging;
+
+-- Create staging tables for Snowpipe Streaming
+CREATE TABLE IF NOT EXISTS orders_staging (
+    order_id VARCHAR(36),
+    customer_id INTEGER,
+    order_date TIMESTAMP_NTZ,
+    order_status VARCHAR(20),
+    total_amount FLOAT,
+    discount_percent FLOAT,
+    shipping_cost FLOAT
+)
+COMMENT = 'Staging table for order data from Snowpipe Streaming';
+
+CREATE TABLE IF NOT EXISTS order_items_staging (
+    order_item_id VARCHAR(36),
+    order_id VARCHAR(36),
+    product_id INTEGER,
+    product_name VARCHAR(100),
+    product_category VARCHAR(50),
+    quantity INTEGER,
+    unit_price FLOAT,
+    line_total FLOAT
+)
+COMMENT = 'Staging table for order item data from Snowpipe Streaming';
+
+-- Snapshot table for benchmarking
+CREATE TABLE IF NOT EXISTS discount_snapshot (
+    order_id VARCHAR(36),
+    discount_percent FLOAT
+);
+
+-- Create Gen2 warehouse
+CREATE WAREHOUSE IF NOT EXISTS automated_intelligence_gen2_wh
+WITH 
+    WAREHOUSE_SIZE = 'XSMALL'
+    AUTO_SUSPEND = 60
+    AUTO_RESUME = TRUE
+    RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'
+    COMMENT = 'Gen2 warehouse for data transformation';
+
+-- Procedure: merge_staging_to_raw
+CREATE OR REPLACE PROCEDURE merge_staging_to_raw(
+    return_timing BOOLEAN DEFAULT TRUE
+)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    start_time TIMESTAMP_NTZ;
+    end_time TIMESTAMP_NTZ;
+    orders_merged INTEGER;
+    order_items_merged INTEGER;
+    orders_start TIMESTAMP_NTZ;
+    orders_end TIMESTAMP_NTZ;
+    items_start TIMESTAMP_NTZ;
+    items_end TIMESTAMP_NTZ;
+BEGIN
+    start_time := CURRENT_TIMESTAMP();
+    
+    orders_start := CURRENT_TIMESTAMP();
+    
+    MERGE INTO raw.orders tgt
+    USING (
+        SELECT 
+            order_id,
+            customer_id,
+            order_date,
+            order_status,
+            total_amount
+        FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY order_date DESC) as rn
+            FROM staging.orders_staging
+        )
+        WHERE rn = 1
+    ) src
+    ON tgt.order_id = src.order_id
+    WHEN MATCHED THEN UPDATE SET
+        customer_id = src.customer_id,
+        order_date = src.order_date,
+        order_status = src.order_status,
+        total_amount = src.total_amount
+    WHEN NOT MATCHED THEN INSERT (
+        order_id, customer_id, order_date, order_status, total_amount
+    ) VALUES (
+        src.order_id, src.customer_id, src.order_date, src.order_status,
+        src.total_amount
+    );
+    
+    orders_merged := SQLROWCOUNT;
+    orders_end := CURRENT_TIMESTAMP();
+    
+    items_start := CURRENT_TIMESTAMP();
+    
+    MERGE INTO raw.order_items tgt
+    USING (
+        SELECT 
+            order_item_id,
+            order_id,
+            product_id,
+            product_name,
+            product_category,
+            quantity,
+            unit_price,
+            line_total
+        FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY order_item_id ORDER BY order_item_id) as rn
+            FROM staging.order_items_staging
+        )
+        WHERE rn = 1
+    ) src
+    ON tgt.order_item_id = src.order_item_id
+    WHEN MATCHED THEN UPDATE SET
+        order_id = src.order_id,
+        product_id = src.product_id,
+        product_name = src.product_name,
+        product_category = src.product_category,
+        quantity = src.quantity,
+        unit_price = src.unit_price,
+        line_total = src.line_total
+    WHEN NOT MATCHED THEN INSERT (
+        order_item_id, order_id, product_id, product_name, product_category,
+        quantity, unit_price, line_total
+    ) VALUES (
+        src.order_item_id, src.order_id, src.product_id, src.product_name,
+        src.product_category, src.quantity, src.unit_price,
+        src.line_total
+    );
+    
+    order_items_merged := SQLROWCOUNT;
+    items_end := CURRENT_TIMESTAMP();
+    
+    end_time := CURRENT_TIMESTAMP();
+    
+    IF (return_timing) THEN
+        RETURN OBJECT_CONSTRUCT(
+            'total_duration_ms', DATEDIFF('millisecond', start_time, end_time),
+            'orders', OBJECT_CONSTRUCT(
+                'records_merged', orders_merged,
+                'duration_ms', DATEDIFF('millisecond', orders_start, orders_end)
+            ),
+            'order_items', OBJECT_CONSTRUCT(
+                'records_merged', order_items_merged,
+                'duration_ms', DATEDIFF('millisecond', items_start, items_end)
+            ),
+            'start_time', start_time,
+            'end_time', end_time
+        );
+    ELSE
+        RETURN OBJECT_CONSTRUCT('status', 'success');
+    END IF;
+END;
+$$;
+
+-- Procedure: enrich_raw_data
+CREATE OR REPLACE PROCEDURE enrich_raw_data(
+    return_timing BOOLEAN DEFAULT TRUE
+)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    start_time TIMESTAMP_NTZ;
+    end_time TIMESTAMP_NTZ;
+    orders_updated INTEGER;
+BEGIN
+    start_time := CURRENT_TIMESTAMP();
+    
+    UPDATE raw.orders
+    SET discount_percent = CASE 
+        WHEN total_amount >= 1000 THEN LEAST(discount_percent + 5.0, 50.0)
+        WHEN total_amount >= 500 THEN LEAST(discount_percent + 2.5, 50.0)
+        ELSE discount_percent
+    END
+    WHERE order_date >= DATEADD('day', -30, CURRENT_DATE())
+      AND discount_percent < 50.0;
+    
+    orders_updated := SQLROWCOUNT;
+    
+    end_time := CURRENT_TIMESTAMP();
+    
+    IF (return_timing) THEN
+        RETURN OBJECT_CONSTRUCT(
+            'orders_updated', orders_updated,
+            'duration_ms', DATEDIFF('millisecond', start_time, end_time),
+            'start_time', start_time,
+            'end_time', end_time
+        );
+    ELSE
+        RETURN OBJECT_CONSTRUCT('status', 'success');
+    END IF;
+END;
+$$;
+
+-- Procedure: create_discount_snapshot
+CREATE OR REPLACE PROCEDURE create_discount_snapshot()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+    TRUNCATE TABLE staging.discount_snapshot;
+    
+    INSERT INTO staging.discount_snapshot
+    SELECT order_id, discount_percent
+    FROM raw.orders
+    WHERE order_date >= DATEADD('day', -30, CURRENT_DATE());
+    
+    RETURN 'Discount snapshot created';
+END;
+$$;
+
+-- Procedure: restore_discount_snapshot
+CREATE OR REPLACE PROCEDURE restore_discount_snapshot()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+    UPDATE raw.orders
+    SET discount_percent = snapshot.discount_percent
+    FROM staging.discount_snapshot snapshot
+    WHERE raw.orders.order_id = snapshot.order_id;
+    
+    RETURN 'Discount values restored from snapshot';
+END;
+$$;
+
+-- Procedure: truncate_staging_tables
+CREATE OR REPLACE PROCEDURE truncate_staging_tables()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+    TRUNCATE TABLE staging.orders_staging;
+    TRUNCATE TABLE staging.order_items_staging;
+    
+    RETURN 'Staging tables truncated successfully';
+END;
+$$;
+
+-- Procedure: get_staging_counts
+CREATE OR REPLACE PROCEDURE get_staging_counts()
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    orders_count INTEGER;
+    order_items_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO orders_count FROM staging.orders_staging;
+    SELECT COUNT(*) INTO order_items_count FROM staging.order_items_staging;
+    
+    RETURN OBJECT_CONSTRUCT(
+        'orders_staging', orders_count,
+        'order_items_staging', order_items_count,
+        'total_pending', orders_count + order_items_count
+    );
+END;
+$$;
 
 
 -- ============================================================================
@@ -541,9 +949,59 @@ GROUP BY product_category;
 
 
 -- ============================================================================
+-- STEP 4.5: Create Interactive Tables and Warehouse
+-- ============================================================================
+
+USE SCHEMA automated_intelligence.interactive;
+
+-- Create interactive tables (aggregated customer analytics)
+CREATE OR REPLACE INTERACTIVE TABLE customer_order_analytics
+  CLUSTER BY (customer_id)
+AS
+SELECT 
+  c.customer_id,
+  c.first_name,
+  c.last_name,
+  c.email,
+  c.customer_segment,
+  COUNT(DISTINCT o.order_id) as total_orders,
+  SUM(o.total_amount) as total_spent,
+  AVG(o.total_amount) as avg_order_value,
+  MIN(o.order_date) as first_order_date,
+  MAX(o.order_date) as last_order_date
+FROM automated_intelligence.raw.customers c
+INNER JOIN automated_intelligence.raw.orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.first_name, c.last_name, c.email, c.customer_segment;
+
+CREATE OR REPLACE INTERACTIVE TABLE order_lookup
+  CLUSTER BY (order_id)
+AS
+SELECT 
+  o.order_id,
+  o.customer_id,
+  o.order_date,
+  o.order_status,
+  o.total_amount,
+  c.first_name,
+  c.last_name,
+  c.email
+FROM automated_intelligence.raw.orders o
+INNER JOIN automated_intelligence.raw.customers c ON o.customer_id = c.customer_id;
+
+-- Create interactive warehouse
+CREATE OR REPLACE INTERACTIVE WAREHOUSE automated_intelligence_interactive_wh
+  TABLES (customer_order_analytics, order_lookup)
+  WAREHOUSE_SIZE = 'XSMALL';
+
+ALTER WAREHOUSE automated_intelligence_interactive_wh RESUME;
+
+
+-- ============================================================================
 -- STEP 5: Setup Data Quality Monitoring with DMFs
 -- ============================================================================
 
+-- Switch back to standard warehouse for DMF views (interactive warehouses can't query DMF results)
+USE WAREHOUSE automated_intelligence_wh;
 USE SCHEMA automated_intelligence.raw;
 
 -- Set DMF schedule to trigger on data changes
@@ -687,7 +1145,7 @@ WHEN NOT MATCHED THEN
   INSERT (product_id, product_name, product_category, description, features, price, stock_quantity)
   VALUES (s.product_id, s.product_name, s.product_category, s.description, s.features, s.price, s.stock_quantity);
 
--- Product reviews and support tickets are generated dynamically by the generate_orders() stored procedure
+-- Product reviews and support tickets can be generated via Snowpipe Streaming
 -- No static inserts needed here
 
 -- ============================================================================
@@ -784,6 +1242,39 @@ CREATE STAGE IF NOT EXISTS automated_intelligence.raw.semantic_models
 
 SHOW STAGES LIKE 'semantic_models' IN automated_intelligence.raw;
 
--- Insert new orders
-SET NEW_ORDERS = 10000;
-CALL automated_intelligence.raw.generate_orders($NEW_ORDERS);
+-- ============================================================================
+-- Generate Initial Data
+-- ============================================================================
+-- Create customers for the system
+-- Orders will be generated via Snowpipe Streaming (see optional setup below)
+SET NUM_CUSTOMERS = 500000;
+
+CALL automated_intelligence.raw.generate_customers($NUM_CUSTOMERS);
+
+-- Note: Use Snowpipe Streaming to generate orders (see snowpipe-streaming-java or snowpipe-streaming-python)
+
+-- ============================================================================
+-- OPTIONAL SETUP SCRIPTS (Run Separately as Needed)
+-- ============================================================================
+-- The following setup files are available for optional features:
+--
+-- 1. SNOWPIPE STREAMING (High-Performance Ingestion)
+--    - snowpipe-streaming-java/setup_pipes.sql
+--    - snowpipe-streaming-python/recreate_pipes.sql
+--    Purpose: Set up Snowpipe Streaming for real-time data ingestion
+--    Use when: You need high-throughput streaming data ingestion
+--
+-- 2. OPENFLOW KAFKA CONNECTOR (Alternative Ingestion)
+--    - openflow-ingestion/setup_snowflake.sql
+--    - openflow-ingestion/setup_openflow_user.sql
+--    - openflow-ingestion/02_create_iceberg_tables.sql (requires ACCOUNTADMIN)
+--    Purpose: Set up Openflow Kafka connector for external data sources
+--    Use when: You need to ingest data from Kafka topics
+--
+-- 3. SECURITY & GOVERNANCE (Row-Level Security Demo)
+--    - security-and-governance/setup_west_coast_manager.sql
+--    Purpose: Create demo role with row-level security policies
+--    Use when: You want to demonstrate region-based access control
+--
+-- Run these scripts individually based on your specific requirements
+-- ============================================================================

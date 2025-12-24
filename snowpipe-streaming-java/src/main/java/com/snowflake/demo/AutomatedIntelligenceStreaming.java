@@ -22,7 +22,7 @@ public class AutomatedIntelligenceStreaming {
 
         int maxCustomerId = streamingManager.getMaxCustomerId();
         if (maxCustomerId == 0) {
-            logger.error("No customers found in database. Please run generate_orders() stored procedure first to create customers.");
+            logger.error("No customers found in database. Please run generate_customers() stored procedure first to create customers.");
             throw new IllegalStateException("No customers available for order generation");
         }
         logger.info("Will generate orders for customer IDs in range 1-{}", maxCustomerId);

@@ -1,6 +1,6 @@
 # Snowpipe Streaming for Automated Intelligence
 
-This project implements real-time data ingestion using Snowflake's Snowpipe Streaming high-performance architecture. It complements the existing stored procedure (`generate_orders()`) by enabling continuous, low-latency streaming of orders and order items for existing customers in Snowflake.
+This project implements real-time data ingestion using Snowflake's Snowpipe Streaming high-performance architecture. It enables continuous, low-latency streaming of orders and order items for existing customers in Snowflake.
 
 ## 🚀 Billion-Scale Architecture
 
@@ -92,7 +92,7 @@ Offset tokens enable:
 ### Snowflake Setup
 
 1. **Database and Tables**: Run `setup.sql` to create the base infrastructure
-2. **Initial Customers**: Run `CALL generate_orders(100);` to create initial customer data
+2. **Initial Customers**: Run `CALL generate_customers(500000);` to create customer data
 3. **PIPE Objects**: Run `setup_pipes.sql` to create streaming pipes (ORDERS_PIPE and ORDER_ITEMS_PIPE)
 
 ### Authentication Setup
@@ -452,7 +452,7 @@ This is automatically configured for Maven via `.mvn/jvm.config`, but required f
 
 ### No Customers Error
 
-- Run `CALL generate_orders(100);` to create initial customers
+- Run `CALL generate_customers(500000);` to create customers
 - Verify customers exist: `SELECT COUNT(*) FROM customers;`
 
 ## Architecture Differences: High-Performance vs Classic

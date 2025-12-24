@@ -218,8 +218,8 @@ raw.* tables (production)
 
 **Quick start:**
 ```sql
--- Generate new orders
-CALL automated_intelligence.raw.generate_orders(500);
+-- Generate new orders via Snowpipe Streaming
+-- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
 
 -- Manually refresh each tier (production: automatic!)
 ALTER DYNAMIC TABLE enriched_orders REFRESH;
@@ -599,8 +599,8 @@ DROP ROLE IF EXISTS west_coast_manager;
 Or keep the structure and just add more data:
 
 ```sql
--- Add another batch for follow-up demos
-CALL automated_intelligence.raw.generate_orders(1000);
+-- Add more orders via Snowpipe Streaming
+-- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
 ```
 
 ---

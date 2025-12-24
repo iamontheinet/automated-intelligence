@@ -4,11 +4,10 @@ Real-Time Pipeline Demo for Interactive Tables
 Purpose: Demonstrate real-time data flow from ingestion to serving
 
 This script:
-1. Triggers data generation (via stored procedure or Snowpipe Streaming)
-2. Monitors data appearing in raw tables
-3. Waits for Dynamic Tables refresh
-4. Queries new data from Interactive Tables with <100ms latency
-5. Shows end-to-end pipeline latency
+1. Monitors data appearing in raw tables (from Snowpipe Streaming)
+2. Waits for Interactive Tables refresh
+3. Queries data from Interactive Tables with <100ms latency
+4. Shows end-to-end pipeline latency
 
 Flow:
   Ingestion → Raw Tables (seconds)
@@ -17,8 +16,10 @@ Flow:
   → Query Results (<100ms)
 
 Usage:
-    python realtime_demo.py --generate-orders 100
     python realtime_demo.py --monitor-pipeline
+    
+Note: Order generation now uses Snowpipe Streaming.
+See snowpipe-streaming-java/ or snowpipe-streaming-python/ directories.
 """
 
 import argparse
@@ -61,31 +62,22 @@ class RealtimePipelineDemo:
             cursor.close()
             return None
     
-    def generate_orders_via_sproc(self, num_orders: int = 100):
-        """Generate new orders using the stored procedure"""
+    def get_latest_order_id(self):
+        """Get the latest order_id from raw.orders table"""
         print(f"\n{'='*80}")
-        print(f"STEP 1: Generate {num_orders} New Orders")
+        print(f"STEP 1: Check Current Orders")
         print(f"{'='*80}")
         
-        print(f"\n⏳ Calling generate_orders({num_orders})...")
-        start_time = time.time()
+        print(f"\n⏳ Querying latest order...")
         
-        # Must use standard warehouse for stored procedure calls
         self.execute_query("USE WAREHOUSE automated_intelligence_wh", fetch=False)
-        
-        self.execute_query(
-            f"CALL automated_intelligence.raw.generate_orders({num_orders})",
-            fetch=False
-        )
-        
-        elapsed = time.time() - start_time
-        print(f"✅ Generated {num_orders} orders in {elapsed:.2f} seconds")
         
         result = self.execute_query(
             "SELECT MAX(order_id) as latest_order FROM automated_intelligence.raw.orders"
         )
         latest_order_id = result[0][0]
         print(f"📊 Latest order_id: {latest_order_id}")
+        print(f"\n💡 Use Snowpipe Streaming to generate new orders")
         
         return latest_order_id
     
@@ -280,7 +272,10 @@ class RealtimePipelineDemo:
         try:
             self.show_pipeline_stats()
             
-            latest_order_id = self.generate_orders_via_sproc(num_orders)
+            print(f"\n⚠️  Order generation via stored procedure is deprecated.")
+            print(f"    Please use Snowpipe Streaming to generate orders.")
+            print(f"    See: snowpipe-streaming-java/ or snowpipe-streaming-python/\n")
+            latest_order_id = self.get_latest_order_id()
             
             # Skip dynamic tables - interactive tables refresh directly from raw
             if self.monitor_interactive_tables_refresh(latest_order_id, timeout=180):
