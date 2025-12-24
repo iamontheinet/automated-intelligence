@@ -17,7 +17,7 @@ sources:
           - name: email
             tests:
               - not_null
-          - name: signup_date
+          - name: registration_date
             tests:
               - not_null
       
