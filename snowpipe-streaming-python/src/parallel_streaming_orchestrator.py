@@ -204,8 +204,13 @@ class PartitionedStreamingApp:
                     )
                     all_order_items.extend(order_items)
                 
-                self.streaming_manager.insert_orders(order_batch)
-                self.streaming_manager.insert_order_items(all_order_items)
+                # Insert both orders and order_items - if either fails, both should fail
+                try:
+                    self.streaming_manager.insert_orders(order_batch)
+                    self.streaming_manager.insert_order_items(all_order_items)
+                except Exception as e:
+                    logger.error(f"Failed to insert batch: {e}")
+                    raise  # Re-raise to stop processing
                 
                 processed_orders += current_batch_size
                 logger.info(
