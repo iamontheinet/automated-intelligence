@@ -41,7 +41,10 @@ class DataGenerator:
         "Ski Boots", "Snowboard Boots", "Ski Poles", "Ski Goggles", "Snowboard Bindings", "Ski Helmet"
     ]
     
-    PRODUCT_CATEGORIES = ["Skis", "Snowboards", "Boots", "Accessories"]
+    PRODUCT_CATEGORIES = [
+        "Skis", "Skis", "Snowboards", "Snowboards",
+        "Boots", "Boots", "Accessories", "Accessories", "Accessories", "Accessories"
+    ]
 
     @staticmethod
     def random_customer_id(max_customer_id: int) -> int:
@@ -132,20 +135,11 @@ class DataGenerator:
         items = []
         for i in range(count):
             order_item_id = str(uuid.uuid4())
-            product_id = 1001 + random.randint(0, 9)
-            product_name = random.choice(DataGenerator.PRODUCT_NAMES)
             
-            # Weighted product category distribution for realistic sales patterns
-            # 40% Skis, 30% Snowboards, 20% Accessories, 10% Apparel
-            rand = random.random()
-            if rand < 0.40:
-                product_category = "Skis"
-            elif rand < 0.70:
-                product_category = "Snowboards"
-            elif rand < 0.90:
-                product_category = "Accessories"
-            else:
-                product_category = "Apparel"
+            product_index = random.randint(0, len(DataGenerator.PRODUCT_NAMES) - 1)
+            product_id = 1001 + product_index
+            product_name = DataGenerator.PRODUCT_NAMES[product_index]
+            product_category = DataGenerator.PRODUCT_CATEGORIES[product_index]
             
             quantity = random.randint(1, 5)
             unit_price = DataGenerator._random_decimal(10.0, 500.0)

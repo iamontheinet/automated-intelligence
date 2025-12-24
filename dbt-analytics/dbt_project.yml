@@ -44,5 +44,5 @@ vars:
   lookback_days: 90
   
   # Customer segmentation thresholds
-  high_value_threshold: 1000
-  active_customer_days: 90
+  high_value_threshold: 17500
+  active_customer_days: 21

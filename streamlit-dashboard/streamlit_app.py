@@ -20,10 +20,11 @@ system_health_page = st.Page("pages/7_system_health.py", title="System Health", 
 query_performance_page = st.Page("pages/4_query_performance.py", title="Interactive vs Standard", icon="⚡", url_path="query_performance")
 warehouse_performance_page = st.Page("pages/1_data_pipeline.py", title="Gen 1 vs Gen 2", icon="🚀", url_path="warehouse_performance")
 ml_insights_page = st.Page("pages/5_ml_insights.py", title="Distributed ML", icon="🔮", url_path="ml_insights")
-summary_page = st.Page("pages/6_summary.py", title="Summary", icon="📈", url_path="summary")
+customer_product_analytics_page = st.Page("pages/8_customer_product_analytics.py", title="Customer & Product Analytics", icon="📈", url_path="customer_product_analytics")
+summary_page = st.Page("pages/6_summary.py", title="Summary", icon="📋", url_path="summary")
 
 # Create navigation with default page
-pg = st.navigation([live_ingestion_page, pipeline_health_page, system_health_page, query_performance_page, warehouse_performance_page, ml_insights_page, summary_page])
+pg = st.navigation([live_ingestion_page, pipeline_health_page, system_health_page, query_performance_page, warehouse_performance_page, ml_insights_page, customer_product_analytics_page, summary_page])
 
 # Auto-refresh controls in sidebar
 with st.sidebar:

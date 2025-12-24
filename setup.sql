@@ -187,33 +187,31 @@ BEGIN
             SELECT SEQ4() AS item_num FROM TABLE(GENERATOR(ROWCOUNT => 10))
         ) numbers
         WHERE numbers.item_num < o.items_count
+    ),
+    product_mapping AS (
+        SELECT 1 as product_num, 1001 as product_id, 'Powder Skis' as product_name, 'Skis' as product_category
+        UNION ALL SELECT 2, 1002, 'All-Mountain Skis', 'Skis'
+        UNION ALL SELECT 3, 1003, 'Freestyle Snowboard', 'Snowboards'
+        UNION ALL SELECT 4, 1004, 'Freeride Snowboard', 'Snowboards'
+        UNION ALL SELECT 5, 1005, 'Ski Boots', 'Boots'
+        UNION ALL SELECT 6, 1006, 'Snowboard Boots', 'Boots'
+        UNION ALL SELECT 7, 1007, 'Ski Poles', 'Accessories'
+        UNION ALL SELECT 8, 1008, 'Ski Goggles', 'Accessories'
+        UNION ALL SELECT 9, 1009, 'Snowboard Bindings', 'Accessories'
+        UNION ALL SELECT 10, 1010, 'Ski Helmet', 'Accessories'
     )
     SELECT
         UUID_STRING() AS order_item_id,
-        order_id,
-        1001 + UNIFORM(0, 9, RANDOM()) AS product_id,
-        CASE UNIFORM(1, 10, RANDOM())
-            WHEN 1 THEN 'Powder Skis'
-            WHEN 2 THEN 'All-Mountain Skis'
-            WHEN 3 THEN 'Freestyle Snowboard'
-            WHEN 4 THEN 'Freeride Snowboard'
-            WHEN 5 THEN 'Ski Boots'
-            WHEN 6 THEN 'Snowboard Boots'
-            WHEN 7 THEN 'Ski Poles'
-            WHEN 8 THEN 'Ski Goggles'
-            WHEN 9 THEN 'Snowboard Bindings'
-            ELSE 'Ski Helmet'
-        END AS product_name,
-        CASE UNIFORM(1, 4, RANDOM())
-            WHEN 1 THEN 'Skis'
-            WHEN 2 THEN 'Snowboards'
-            WHEN 3 THEN 'Boots'
-            ELSE 'Accessories'
-        END AS product_category,
+        eo.order_id,
+        pm.product_id,
+        pm.product_name,
+        pm.product_category,
         UNIFORM(1, 5, RANDOM()) AS quantity,
         ROUND(UNIFORM(10, 500, RANDOM()), 2) AS unit_price,
         ROUND(UNIFORM(1, 5, RANDOM()) * UNIFORM(10, 500, RANDOM()), 2) AS line_total
-    FROM expanded_orders;
+    FROM expanded_orders eo
+    CROSS JOIN product_mapping pm
+    WHERE pm.product_num = UNIFORM(1, 10, RANDOM());
     
     -- Insert product reviews (10% of customers leave reviews for products they actually purchased)
     INSERT INTO product_reviews (product_id, customer_id, review_date, rating, review_title, review_text, verified_purchase)

@@ -15,7 +15,7 @@ enriched as (
         oi.order_id,
         oi.product_id,
         oi.product_name,
-        oi.product_category,
+        coalesce(p.product_category, oi.product_category) as product_category,
         oi.quantity,
         oi.unit_price,
         oi.line_total,
@@ -35,7 +35,7 @@ enriched as (
         oi.line_total / nullif(oi.quantity, 0) as calculated_unit_price
         
     from order_items oi
-    left join products p on oi.product_id = p.product_id
+    left join products p on oi.product_name = p.product_name
 )
 
 select * from enriched

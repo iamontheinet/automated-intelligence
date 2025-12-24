@@ -69,7 +69,8 @@ public class DataGenerator {
     };
 
     private static final String[] PRODUCT_CATEGORIES = {
-        "Skis", "Snowboards", "Boots", "Accessories"
+        "Skis", "Skis", "Snowboards", "Snowboards",
+        "Boots", "Boots", "Accessories", "Accessories", "Accessories", "Accessories"
     };
 
     public static Customer generateCustomer(int customerId) {
@@ -135,22 +136,11 @@ public class DataGenerator {
         List<OrderItem> items = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             String orderItemId = UUID.randomUUID().toString();
-            int productId = 1001 + random.nextInt(10);
-            String productName = randomElement(PRODUCT_NAMES);
             
-            // Weighted product category distribution for realistic sales patterns
-            // 40% Skis, 30% Snowboards, 20% Accessories, 10% Apparel
-            String productCategory;
-            double rand = random.nextDouble();
-            if (rand < 0.40) {
-                productCategory = "Skis";
-            } else if (rand < 0.70) {
-                productCategory = "Snowboards";
-            } else if (rand < 0.90) {
-                productCategory = "Accessories";
-            } else {
-                productCategory = "Apparel";
-            }
+            int productIndex = random.nextInt(PRODUCT_NAMES.length);
+            int productId = 1001 + productIndex;
+            String productName = PRODUCT_NAMES[productIndex];
+            String productCategory = PRODUCT_CATEGORIES[productIndex];
             
             int quantity = random.nextInt(5) + 1;
             BigDecimal unitPrice = randomDecimal(10.0, 500.0);
