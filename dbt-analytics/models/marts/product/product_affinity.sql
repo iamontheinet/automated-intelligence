@@ -6,8 +6,7 @@ with order_items as (
         order_id,
         product_id,
         product_name,
-        category,
-        brand
+        product_category
     from {{ ref('stg_order_items') }}
 ),
 
@@ -16,10 +15,10 @@ product_pairs as (
     select
         oi1.product_id as product_a_id,
         oi1.product_name as product_a_name,
-        oi1.category as product_a_category,
+        oi1.product_category as product_a_category,
         oi2.product_id as product_b_id,
         oi2.product_name as product_b_name,
-        oi2.category as product_b_category,
+        oi2.product_category as product_b_category,
         oi1.order_id
     from order_items oi1
     join order_items oi2 
