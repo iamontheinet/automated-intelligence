@@ -660,8 +660,10 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   status VARCHAR(20)
 );
 
--- Insert sample product catalog data
-INSERT INTO product_catalog VALUES
+-- Insert sample product catalog data (use MERGE to prevent duplicates)
+MERGE INTO product_catalog t
+USING (
+  SELECT * FROM (VALUES
   (1001, 'Powder Skis', 'Skis', 'Premium powder skis designed for deep snow conditions. Featuring a wide waist and rockered tip for effortless floating in backcountry powder.', 'Wide waist (115mm), Rockered tip and tail, Carbon fiber construction, Lightweight design', 799.99, 15),
   (1002, 'All-Mountain Skis', 'Skis', 'Versatile all-mountain skis perfect for any terrain. Handles groomed runs, powder, and moguls with equal confidence.', 'Medium waist (88mm), Progressive sidecut, Titanal reinforcement, Durable construction', 649.99, 25),
   (1003, 'Freestyle Snowboard', 'Snowboards', 'Twin-tip freestyle snowboard for park and pipe. Perfect for tricks, jumps, and jibbing with a soft, playful flex.', 'True twin shape, Soft flex rating, Sintered base, Pop-optimized core', 549.99, 20),
@@ -671,7 +673,21 @@ INSERT INTO product_catalog VALUES
   (1007, 'Ski Poles', 'Accessories', 'Lightweight aluminum ski poles with ergonomic grips. Adjustable length for different terrain and snow conditions.', 'Aluminum construction, Adjustable length (105-135cm), Powder baskets, Padded straps', 79.99, 50),
   (1008, 'Ski Goggles', 'Accessories', 'Anti-fog ski goggles with interchangeable lenses. Superior optics and peripheral vision for all weather conditions.', 'Anti-fog coating, UV protection, Interchangeable lenses, Helmet compatible', 149.99, 40),
   (1009, 'Snowboard Bindings', 'Accessories', 'Responsive snowboard bindings with tool-free adjustment. Lightweight and compatible with all mounting systems.', 'Tool-free adjustment, Canted footbeds, Universal disk, Highback rotation', 249.99, 28),
-  (1010, 'Ski Helmet', 'Accessories', 'Safety-certified ski helmet with integrated audio system. Lightweight construction with adjustable ventilation.', 'MIPS protection, Audio-ready, Adjustable vents, Goggle clip, Multiple sizes', 179.99, 45);
+  (1010, 'Ski Helmet', 'Accessories', 'Safety-certified ski helmet with integrated audio system. Lightweight construction with adjustable ventilation.', 'MIPS protection, Audio-ready, Adjustable vents, Goggle clip, Multiple sizes', 179.99, 45)
+  ) AS s(product_id, product_name, product_category, description, features, price, stock_quantity)
+) s
+ON t.product_id = s.product_id
+WHEN MATCHED THEN
+  UPDATE SET
+    product_name = s.product_name,
+    product_category = s.product_category,
+    description = s.description,
+    features = s.features,
+    price = s.price,
+    stock_quantity = s.stock_quantity
+WHEN NOT MATCHED THEN
+  INSERT (product_id, product_name, product_category, description, features, price, stock_quantity)
+  VALUES (s.product_id, s.product_name, s.product_category, s.description, s.features, s.price, s.stock_quantity);
 
 -- Product reviews and support tickets are generated dynamically by the generate_orders() stored procedure
 -- No static inserts needed here
