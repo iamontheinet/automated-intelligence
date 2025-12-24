@@ -3,7 +3,6 @@
 
 with source as (
     select * from {{ source('raw', 'product_catalog') }}
-    qualify row_number() over (partition by product_id order by product_id) = 1
 ),
 
 staged as (
