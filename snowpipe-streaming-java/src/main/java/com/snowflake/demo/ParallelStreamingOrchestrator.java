@@ -115,23 +115,24 @@ public class ParallelStreamingOrchestrator {
         
         long startTime = System.currentTimeMillis();
         SnowpipeStreamingManager streamingManager = null;
+        int ordersGenerated = 0;
         
         try {
             streamingManager = new SnowpipeStreamingManager(config, instanceId);
             PartitionedStreamingApp app = new PartitionedStreamingApp(
                 config, streamingManager, customerIdStart, customerIdEnd);
             
-            app.generateAndStreamOrders(numOrders);
+            ordersGenerated = app.generateAndStreamOrders(numOrders);
             
             Thread.sleep(2000);
             
             long duration = System.currentTimeMillis() - startTime;
-            return new StreamingResult(instanceId, numOrders, duration, true);
+            return new StreamingResult(instanceId, ordersGenerated, duration, true);
             
         } catch (Exception e) {
             logger.error("Instance {} error: {}", instanceId, e.getMessage(), e);
             long duration = System.currentTimeMillis() - startTime;
-            return new StreamingResult(instanceId, 0, duration, false);
+            return new StreamingResult(instanceId, ordersGenerated, duration, false);
         } finally {
             if (streamingManager != null) {
                 streamingManager.close();
@@ -182,7 +183,7 @@ class PartitionedStreamingApp {
         this.customerIdEnd = customerIdEnd;
     }
 
-    public void generateAndStreamOrders(int numOrders) throws Exception {
+    public int generateAndStreamOrders(int numOrders) throws Exception {
         logger.info("Starting partitioned streaming: {} orders, customer range {}-{}", 
                    numOrders, customerIdStart, customerIdEnd);
 
@@ -190,38 +191,56 @@ class PartitionedStreamingApp {
         logger.info("Using batch size: {} orders per insertRows call", batchSize);
         
         int processedOrders = 0;
+        int maxRetries = 3;
+        
         while (processedOrders < numOrders) {
             int remainingOrders = numOrders - processedOrders;
             int currentBatchSize = Math.min(batchSize, remainingOrders);
             
-            try {
-                List<Order> orderBatch = new ArrayList<>(currentBatchSize);
-                List<OrderItem> allOrderItems = new ArrayList<>();
-                
-                for (int i = 0; i < currentBatchSize; i++) {
-                    int customerId = DataGenerator.randomCustomerIdInRange(customerIdStart, customerIdEnd);
-                    Order order = DataGenerator.generateOrder(customerId);
-                    orderBatch.add(order);
+            int retryCount = 0;
+            while (retryCount <= maxRetries) {
+                try {
+                    List<Order> orderBatch = new ArrayList<>(currentBatchSize);
+                    List<OrderItem> allOrderItems = new ArrayList<>();
                     
-                    int itemCount = DataGenerator.randomItemCount();
-                    List<OrderItem> orderItems = DataGenerator.generateOrderItems(order.getOrderId(), itemCount);
-                    allOrderItems.addAll(orderItems);
+                    for (int i = 0; i < currentBatchSize; i++) {
+                        int customerId = DataGenerator.randomCustomerIdInRange(customerIdStart, customerIdEnd);
+                        Order order = DataGenerator.generateOrder(customerId);
+                        orderBatch.add(order);
+                        
+                        int itemCount = DataGenerator.randomItemCount();
+                        List<OrderItem> orderItems = DataGenerator.generateOrderItems(order.getOrderId(), itemCount);
+                        allOrderItems.addAll(orderItems);
+                    }
+                    
+                    // Insert both orders and order_items - if either fails, both should fail
+                    streamingManager.insertOrders(orderBatch);
+                    streamingManager.insertOrderItems(allOrderItems);
+                    
+                    // Success - break out of retry loop
+                    processedOrders += currentBatchSize;
+                    logger.info("Progress: {}/{} orders streamed ({} order items)", 
+                               processedOrders, numOrders, allOrderItems.size());
+                    break;
+                    
+                } catch (Exception e) {
+                    retryCount++;
+                    if (retryCount > maxRetries) {
+                        logger.error("Failed to insert batch after {} retries at position {}: {}", 
+                                   maxRetries, processedOrders, e.getMessage(), e);
+                        throw e;
+                    } else {
+                        logger.warn("Batch insert failed (attempt {}/{}), retrying: {}", 
+                                   retryCount, maxRetries, e.getMessage());
+                        Thread.sleep(1000L * retryCount);  // Exponential backoff
+                    }
                 }
-                
-                streamingManager.insertOrders(orderBatch);
-                streamingManager.insertOrderItems(allOrderItems);
-                
-                processedOrders += currentBatchSize;
-                logger.info("Progress: {}/{} orders streamed ({} order items)", 
-                           processedOrders, numOrders, allOrderItems.size());
-
-            } catch (Exception e) {
-                logger.error("Error generating order batch at position {}: {}", processedOrders, e.getMessage(), e);
-                throw e;
             }
         }
 
         logger.info("Successfully streamed {} orders (customer range: {}-{})", 
                    numOrders, customerIdStart, customerIdEnd);
+        
+        return processedOrders;
     }
 }

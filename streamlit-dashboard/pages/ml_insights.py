@@ -322,7 +322,7 @@ with tab2:
                 st.info("No high-risk customers found in the 5-7 day window.")
         
         else:
-            st.warning("No customer data available for predictions.")
+            st.warning("⚠️ No trained model found. Please run the Ray training notebook first.")
     
     except Exception as e:
         st.error(f"Error loading predictions: {str(e)}")

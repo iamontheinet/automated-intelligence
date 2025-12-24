@@ -117,6 +117,7 @@ class ParallelStreamingOrchestrator:
         
         start_time = time.time()
         streaming_manager = None
+        orders_generated = 0
         
         try:
             streaming_manager = SnowpipeStreamingManager(config, instance_id)
@@ -124,14 +125,14 @@ class ParallelStreamingOrchestrator:
                 config, streaming_manager, customer_id_start, customer_id_end
             )
             
-            app.generate_and_stream_orders(num_orders)
+            orders_generated = app.generate_and_stream_orders(num_orders)
             
             time.sleep(2)
             
             duration_ms = int((time.time() - start_time) * 1000)
             return {
                 "instance_id": instance_id,
-                "orders_generated": num_orders,
+                "orders_generated": orders_generated,
                 "duration_ms": duration_ms,
                 "success": True,
             }
@@ -141,7 +142,7 @@ class ParallelStreamingOrchestrator:
             duration_ms = int((time.time() - start_time) * 1000)
             return {
                 "instance_id": instance_id,
-                "orders_generated": 0,
+                "orders_generated": orders_generated,
                 "duration_ms": duration_ms,
                 "success": False,
             }
@@ -173,7 +174,7 @@ class PartitionedStreamingApp:
         self.customer_id_start = customer_id_start
         self.customer_id_end = customer_id_end
 
-    def generate_and_stream_orders(self, num_orders: int) -> None:
+    def generate_and_stream_orders(self, num_orders: int) -> int:
         logger.info(
             f"Starting partitioned streaming: {num_orders} orders, "
             f"customer range {self.customer_id_start}-{self.customer_id_end}"
@@ -183,52 +184,63 @@ class PartitionedStreamingApp:
         logger.info(f"Using batch size: {batch_size} orders per insertRows call")
         
         processed_orders = 0
+        max_retries = 3
+        
         while processed_orders < num_orders:
             remaining_orders = num_orders - processed_orders
             current_batch_size = min(batch_size, remaining_orders)
             
-            try:
-                order_batch: List[Order] = []
-                all_order_items: List[OrderItem] = []
-                
-                for i in range(current_batch_size):
-                    customer_id = DataGenerator.random_customer_id_in_range(
-                        self.customer_id_start, self.customer_id_end
-                    )
-                    order = DataGenerator.generate_order(customer_id)
-                    order_batch.append(order)
-                    
-                    item_count = DataGenerator.random_item_count()
-                    order_items = DataGenerator.generate_order_items(
-                        order.order_id, item_count
-                    )
-                    all_order_items.extend(order_items)
-                
-                # Insert both orders and order_items - if either fails, both should fail
+            retry_count = 0
+            while retry_count <= max_retries:
                 try:
+                    order_batch: List[Order] = []
+                    all_order_items: List[OrderItem] = []
+                    
+                    for i in range(current_batch_size):
+                        customer_id = DataGenerator.random_customer_id_in_range(
+                            self.customer_id_start, self.customer_id_end
+                        )
+                        order = DataGenerator.generate_order(customer_id)
+                        order_batch.append(order)
+                        
+                        item_count = DataGenerator.random_item_count()
+                        order_items = DataGenerator.generate_order_items(
+                            order.order_id, item_count
+                        )
+                        all_order_items.extend(order_items)
+                    
+                    # Insert both orders and order_items - if either fails, both should fail
                     self.streaming_manager.insert_orders(order_batch)
                     self.streaming_manager.insert_order_items(all_order_items)
+                    
+                    # Success - break out of retry loop
+                    processed_orders += current_batch_size
+                    logger.info(
+                        f"Progress: {processed_orders}/{num_orders} orders streamed "
+                        f"({len(all_order_items)} order items)"
+                    )
+                    break
+                    
                 except Exception as e:
-                    logger.error(f"Failed to insert batch: {e}")
-                    raise  # Re-raise to stop processing
-                
-                processed_orders += current_batch_size
-                logger.info(
-                    f"Progress: {processed_orders}/{num_orders} orders streamed "
-                    f"({len(all_order_items)} order items)"
-                )
-                
-            except Exception as e:
-                logger.error(
-                    f"Error generating order batch at position {processed_orders}: {e}",
-                    exc_info=True,
-                )
-                raise
+                    retry_count += 1
+                    if retry_count > max_retries:
+                        logger.error(
+                            f"Failed to insert batch after {max_retries} retries at position {processed_orders}: {e}",
+                            exc_info=True,
+                        )
+                        raise
+                    else:
+                        logger.warning(
+                            f"Batch insert failed (attempt {retry_count}/{max_retries}), retrying: {e}"
+                        )
+                        time.sleep(1 * retry_count)  # Exponential backoff
         
         logger.info(
             f"Successfully streamed {num_orders} orders "
             f"(customer range: {self.customer_id_start}-{self.customer_id_end})"
         )
+        
+        return processed_orders
 
 
 if __name__ == "__main__":

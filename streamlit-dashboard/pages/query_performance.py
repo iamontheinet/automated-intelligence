@@ -83,8 +83,7 @@ if st.session_state.test_running:
                     results = session.sql(actual_query).collect()
                     duration = (time.time() - start) * 1000
                     
-                    if len(results) == 0:
-                        print(f"WARNING: No results for customer_id {customer_id}")
+                    # Removed warning - all customer IDs now guaranteed to have orders
                     
                     return duration
                 except Exception as e:
@@ -94,13 +93,25 @@ if st.session_state.test_running:
             run_interactive = warehouse_option in ["Both - Interactive & Standard", "Interactive Only"]
             run_standard = warehouse_option in ["Both - Interactive & Standard", "Standard Only"]
             
+            # Get a sample of actual customer IDs that have orders
+            sample_customers = session.sql("""
+                SELECT DISTINCT customer_id 
+                FROM AUTOMATED_INTELLIGENCE.RAW.ORDERS 
+                ORDER BY RANDOM() 
+                LIMIT 1000
+            """).collect()
+            available_customer_ids = [row[0] for row in sample_customers]
+            
+            if len(available_customer_ids) < num_queries:
+                st.warning(f"⚠️ Only {len(available_customer_ids)} customers with orders found. Using those for testing.")
+            
             results = {}
             queries_used = {}
             
             if run_interactive:
                 queries_used['interactive'] = interactive_query
                 interactive_results = []
-                customer_ids = [random.randint(1, 10000) for _ in range(num_queries)]
+                customer_ids = random.choices(available_customer_ids, k=min(num_queries, len(available_customer_ids)))
                 
                 # Run queries concurrently using ThreadPoolExecutor
                 with ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -115,7 +126,7 @@ if st.session_state.test_running:
             if run_standard:
                 queries_used['standard'] = standard_query
                 standard_results = []
-                customer_ids = [random.randint(1, 10000) for _ in range(num_queries)]
+                customer_ids = random.choices(available_customer_ids, k=min(num_queries, len(available_customer_ids)))
                 
                 # Run queries concurrently using ThreadPoolExecutor
                 with ThreadPoolExecutor(max_workers=concurrency) as executor:

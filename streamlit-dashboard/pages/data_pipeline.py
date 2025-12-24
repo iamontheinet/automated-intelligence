@@ -99,15 +99,43 @@ if run_both:
             st.session_state.merge_running = False
             st.stop()
     
-    for i, (label, warehouse) in enumerate(warehouses_to_test):
-        with st.spinner(f"Running MERGE and UPDATE operations with {label}..."):
+    # Resume and warm up BOTH warehouses
+    with st.spinner("Warming up both warehouses..."):
+        for label, warehouse in warehouses_to_test:
             try:
-                # Restore snapshot before each warehouse test (except first)
-                if i > 0:
-                    session.sql("CALL AUTOMATED_INTELLIGENCE.staging.restore_discount_snapshot()").collect()
+                session.sql(f"ALTER WAREHOUSE {warehouse} RESUME IF SUSPENDED").collect()
+                st.info(f"✅ {label} warehouse resumed")
+            except Exception as e:
+                st.warning(f"⚠️ Could not resume {warehouse}: {str(e)}")
+    
+    # Run warmup round to compile stored procedures and prime caches
+    with st.spinner("Running warmup round (not timed)..."):
+        for label, warehouse in warehouses_to_test:
+            try:
+                session.sql("CALL AUTOMATED_INTELLIGENCE.staging.restore_discount_snapshot()").collect()
+                session.sql(f"USE WAREHOUSE {warehouse}").collect()
+                session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
+                
+                # Run actual workload once to compile stored procedures
+                session.sql("CALL AUTOMATED_INTELLIGENCE.staging.merge_staging_to_raw()").collect()
+                session.sql("CALL AUTOMATED_INTELLIGENCE.staging.enrich_raw_data()").collect()
+                
+                st.info(f"✅ {label} warmup complete (stored procedures compiled)")
+            except Exception as e:
+                st.warning(f"⚠️ Warmup failed for {warehouse}: {str(e)}")
+    
+    # Now run the actual timed tests - both starting from identical warm state
+    for i, (label, warehouse) in enumerate(warehouses_to_test):
+        with st.spinner(f"Running timed test with {label}..."):
+            try:
+                # Restore snapshot before each test
+                session.sql("CALL AUTOMATED_INTELLIGENCE.staging.restore_discount_snapshot()").collect()
                 
                 # Set warehouse for this session
                 session.sql(f"USE WAREHOUSE {warehouse}").collect()
+                
+                # Clear query result cache to ensure fair comparison
+                session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
                 
                 # Run MERGE
                 merge_start = time.time()
@@ -167,6 +195,15 @@ if st.session_state.pipeline_results:
         speedup = gen1_total / gen2_total
         improvement_pct = ((gen1_total - gen2_total) / gen1_total) * 100
         
+        # Determine if Gen2 is faster or slower
+        if speedup > 1:
+            speed_label = f"{speedup:.2f}x faster"
+            delta_color = "normal"
+        else:
+            slowdown = gen2_total / gen1_total
+            speed_label = f"{slowdown:.2f}x slower"
+            delta_color = "inverse"
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -174,7 +211,7 @@ if st.session_state.pipeline_results:
         
         with col2:
             st.metric("Gen2 Total Time", f"{gen2_total:,.0f} ms", 
-                     delta=f"{speedup:.2f}x faster", delta_color="normal")
+                     delta=speed_label, delta_color=delta_color)
         
         with col3:
             st.metric("Performance Gain", f"{improvement_pct:.1f}%", 
