@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from shared import get_session, show_header
+from shared import get_session, show_header, format_number
 
 show_header()
 st.subheader("🏥 Pipeline Health")
@@ -136,8 +136,8 @@ try:
         # Check if there's actual data (not null or zero customers)
         if pd.notna(total_customers) and total_customers > 0:
             col1.metric("Avg Orders per Customer", f"{avg_orders:,.2f}" if pd.notna(avg_orders) else "0")
-            col2.metric("Total Revenue", f"${total_revenue:,.2f}" if pd.notna(total_revenue) else "$0.00")
-            col3.metric("Total Customers", f"{total_customers:,}")
+            col2.metric("Total Revenue", f"${format_number(total_revenue)}" if pd.notna(total_revenue) else "$0.00")
+            col3.metric("Total Customers", format_number(total_customers, include_decimals=False))
             
             st.success("✅ Interactive Tables are populated and up-to-date")
         else:

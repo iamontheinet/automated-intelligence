@@ -75,18 +75,25 @@ class ParallelStreamingOrchestrator:
                 successful_instances = 0
                 failed_instances = 0
                 
-                for i, future in enumerate(futures):
+                for future in as_completed(futures):
                     try:
                         result = future.result()
-                        total_orders_generated += result["orders_generated"]
-                        successful_instances += 1
-                        logger.info(
-                            f"Instance {i} completed: {result['orders_generated']} orders "
-                            f"in {result['duration_ms']} ms"
-                        )
+                        if result["success"]:
+                            total_orders_generated += result["orders_generated"]
+                            successful_instances += 1
+                            logger.info(
+                                f"Instance {result['instance_id']} completed: {result['orders_generated']} orders "
+                                f"in {result['duration_ms']} ms"
+                            )
+                        else:
+                            failed_instances += 1
+                            logger.error(
+                                f"Instance {result['instance_id']} failed with {result['orders_generated']} orders "
+                                f"generated before failure"
+                            )
                     except Exception as e:
                         failed_instances += 1
-                        logger.error(f"Instance {i} failed: {e}", exc_info=True)
+                        logger.error(f"Instance failed with exception: {e}", exc_info=True)
                 
                 logger.info("=== Parallel Streaming Completed ===")
                 logger.info(
@@ -210,8 +217,21 @@ class PartitionedStreamingApp:
                         all_order_items.extend(order_items)
                     
                     # Insert both orders and order_items - if either fails, both should fail
-                    self.streaming_manager.insert_orders(order_batch)
-                    self.streaming_manager.insert_order_items(all_order_items)
+                    try:
+                        self.streaming_manager.insert_orders(order_batch)
+                    except Exception as e:
+                        logger.error(f"Failed to insert orders: {e}")
+                        raise
+                    
+                    try:
+                        self.streaming_manager.insert_order_items(all_order_items)
+                    except Exception as e:
+                        logger.error(f"Failed to insert order_items after orders were inserted: {e}")
+                        logger.warning(
+                            f"ATOMICITY VIOLATION: {len(order_batch)} orders were inserted but "
+                            f"{len(all_order_items)} order items failed. This will cause data inconsistency."
+                        )
+                        raise
                     
                     # Success - break out of retry loop
                     processed_orders += current_batch_size

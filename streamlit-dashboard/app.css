@@ -15,3 +15,13 @@ header {
     padding-top: 0 !important;
 }
 
+/* Increase tab label font size */
+.stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+    font-size: 1.2rem !important;
+    font-weight: 500 !important;
+}
+
+.stTabs [data-baseweb="tab-list"] button {
+    padding: 10px 20px !important;
+}
+

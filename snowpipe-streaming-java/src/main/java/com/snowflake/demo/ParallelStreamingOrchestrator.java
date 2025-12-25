@@ -69,13 +69,19 @@ public class ParallelStreamingOrchestrator {
             for (int i = 0; i < futures.size(); i++) {
                 try {
                     StreamingResult result = futures.get(i).get();
-                    totalOrdersGenerated += result.ordersGenerated;
-                    successfulInstances++;
-                    logger.info("Instance {} completed: {} orders in {} ms", 
-                               i, result.ordersGenerated, result.durationMs);
+                    if (result.success) {
+                        totalOrdersGenerated += result.ordersGenerated;
+                        successfulInstances++;
+                        logger.info("Instance {} completed: {} orders in {} ms", 
+                                   result.instanceId, result.ordersGenerated, result.durationMs);
+                    } else {
+                        failedInstances++;
+                        logger.error("Instance {} failed with {} orders generated before failure", 
+                                   result.instanceId, result.ordersGenerated);
+                    }
                 } catch (Exception e) {
                     failedInstances++;
-                    logger.error("Instance {} failed: {}", i, e.getMessage(), e);
+                    logger.error("Instance {} failed with exception: {}", i, e.getMessage(), e);
                 }
             }
 
@@ -214,8 +220,21 @@ class PartitionedStreamingApp {
                     }
                     
                     // Insert both orders and order_items - if either fails, both should fail
-                    streamingManager.insertOrders(orderBatch);
-                    streamingManager.insertOrderItems(allOrderItems);
+                    try {
+                        streamingManager.insertOrders(orderBatch);
+                    } catch (Exception e) {
+                        logger.error("Failed to insert orders: {}", e.getMessage());
+                        throw e;
+                    }
+                    
+                    try {
+                        streamingManager.insertOrderItems(allOrderItems);
+                    } catch (Exception e) {
+                        logger.error("Failed to insert order_items after orders were inserted: {}", e.getMessage());
+                        logger.warn("ATOMICITY VIOLATION: {} orders were inserted but {} order items failed. This will cause data inconsistency.",
+                                   orderBatch.size(), allOrderItems.size());
+                        throw e;
+                    }
                     
                     // Success - break out of retry loop
                     processedOrders += currentBatchSize;

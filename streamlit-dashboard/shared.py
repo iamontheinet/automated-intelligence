@@ -1,6 +1,30 @@
 import streamlit as st
 import os
 
+def format_number(num, include_decimals=True):
+    """Format large numbers with K, M, B suffixes"""
+    if num is None:
+        return "0"
+    
+    num = float(num)
+    
+    if abs(num) >= 1_000_000_000:
+        formatted = num / 1_000_000_000
+        suffix = "B"
+    elif abs(num) >= 1_000_000:
+        formatted = num / 1_000_000
+        suffix = "M"
+    elif abs(num) >= 1_000:
+        formatted = num / 1_000
+        suffix = "K"
+    else:
+        return f"{num:,.0f}" if not include_decimals else f"{num:,.2f}"
+    
+    if include_decimals:
+        return f"{formatted:.2f}{suffix}"
+    else:
+        return f"{formatted:.1f}{suffix}"
+
 def is_streamlit_in_snowflake():
     """Detect if running in Streamlit in Snowflake"""
     return any([

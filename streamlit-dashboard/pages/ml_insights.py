@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from shared import get_session, show_header
+from shared import get_session, show_header, format_number
 import pandas as pd
 from datetime import datetime
 
@@ -211,13 +211,13 @@ with tab2:
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("Total Customers", f"{int(total_customers):,}")
+                st.metric("Total Customers", format_number(int(total_customers), include_decimals=False))
             
             with col2:
-                st.metric("Active Customers", f"{int(active_customers):,}")
+                st.metric("Active Customers", format_number(int(active_customers), include_decimals=False))
             
             with col3:
-                st.metric("Churned Customers", f"{int(churned_customers):,}")
+                st.metric("Churned Customers", format_number(int(churned_customers), include_decimals=False))
             
             with col4:
                 st.metric("Churn Rate", f"{churn_rate:.1f}%")
@@ -298,7 +298,7 @@ with tab2:
             at_risk_df = session.sql(at_risk_query).to_pandas()
 
             # At-risk customers table
-            st.subheader(f"⚠️ High-Risk Customers ({len(at_risk_df):,} found in the 5-7 day window)")
+            st.subheader(f"⚠️ High-Risk Customers ({format_number(len(at_risk_df), include_decimals=False)} found in the 5-7 day window)")
 
             if len(at_risk_df) > 0:
                 st.dataframe(

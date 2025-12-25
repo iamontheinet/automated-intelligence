@@ -63,8 +63,21 @@ class AutomatedIntelligenceStreaming:
                         all_order_items.extend(order_items)
                     
                     # Insert both orders and order_items - if either fails, both should fail
-                    self.streaming_manager.insert_orders(order_batch)
-                    self.streaming_manager.insert_order_items(all_order_items)
+                    try:
+                        self.streaming_manager.insert_orders(order_batch)
+                    except Exception as e:
+                        logger.error(f"Failed to insert orders: {e}")
+                        raise
+                    
+                    try:
+                        self.streaming_manager.insert_order_items(all_order_items)
+                    except Exception as e:
+                        logger.error(f"Failed to insert order_items after orders were inserted: {e}")
+                        logger.warning(
+                            f"ATOMICITY VIOLATION: {len(order_batch)} orders were inserted but "
+                            f"{len(all_order_items)} order items failed. This will cause data inconsistency."
+                        )
+                        raise
                     
                     # Success - break out of retry loop
                     processed_orders += current_batch_size

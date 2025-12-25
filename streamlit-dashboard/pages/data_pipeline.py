@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from shared import get_session, show_header
+from shared import get_session, show_header, format_number
 import time
 import json
 
@@ -36,13 +36,13 @@ try:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Orders Staging", f"{counts['orders_staging']:,}")
+        st.metric("Orders Staging", format_number(counts['orders_staging'], include_decimals=False))
     
     with col2:
-        st.metric("Order Items Staging", f"{counts['order_items_staging']:,}")
+        st.metric("Order Items Staging", format_number(counts['order_items_staging'], include_decimals=False))
     
     with col3:
-        st.metric("Total Pending", f"{counts['total_pending']:,}", 
+        st.metric("Total Pending", format_number(counts['total_pending'], include_decimals=False), 
                  delta="Ready for MERGE" if counts['total_pending'] > 0 else None)
 
 except Exception as e:
@@ -259,16 +259,16 @@ if st.session_state.pipeline_results:
             
             with col1:
                 st.markdown("**MERGE Operations:**")
-                st.text(f"Orders merged: {data['merge']['orders']['records_merged']:,}")
-                st.text(f"Duration: {data['merge']['orders']['duration_ms']:,} ms")
+                st.text(f"Orders merged: {format_number(data['merge']['orders']['records_merged'], include_decimals=False)}")
+                st.text(f"Duration: {format_number(data['merge']['orders']['duration_ms'], include_decimals=False)} ms")
                 st.text("")
-                st.text(f"Order items merged: {data['merge']['order_items']['records_merged']:,}")
-                st.text(f"Duration: {data['merge']['order_items']['duration_ms']:,} ms")
+                st.text(f"Order items merged: {format_number(data['merge']['order_items']['records_merged'], include_decimals=False)}")
+                st.text(f"Duration: {format_number(data['merge']['order_items']['duration_ms'], include_decimals=False)} ms")
             
             with col2:
                 st.markdown("**UPDATE Operations:**")
-                st.text(f"Orders updated: {data['update']['orders_updated']:,}")
-                st.text(f"Duration: {data['update']['duration_ms']:,} ms")
+                st.text(f"Orders updated: {format_number(data['update']['orders_updated'], include_decimals=False)}")
+                st.text(f"Duration: {format_number(data['update']['duration_ms'], include_decimals=False)} ms")
 
 st.divider()
 

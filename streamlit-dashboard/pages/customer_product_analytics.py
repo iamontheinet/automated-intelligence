@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from shared import get_session, show_header
+from shared import get_session, show_header, format_number
 import pandas as pd
 
 show_header()
@@ -56,17 +56,17 @@ with tab1:
                 avg_clv = total_revenue / total_customers if total_customers > 0 else 0
                 
                 with col1:
-                    st.metric("Total Customers", f"{total_customers:,}")
+                    st.metric("Total Customers", format_number(total_customers, include_decimals=False))
                 
                 with col2:
-                    st.metric("Total Revenue", f"${total_revenue:,.2f}")
+                    st.metric("Total Revenue", f"${format_number(total_revenue)}")
                 
                 with col3:
-                    st.metric("Avg CLV", f"${avg_clv:,.2f}")
+                    st.metric("Avg CLV", f"${format_number(avg_clv)}")
                 
                 with col4:
                     active_customers = clv_df[clv_df['CUSTOMER_STATUS'] == 'active']['CUSTOMER_COUNT'].sum()
-                    st.metric("Active Customers", f"{active_customers:,}")
+                    st.metric("Active Customers", format_number(active_customers, include_decimals=False))
                 
                 st.divider()
                 
@@ -222,11 +222,11 @@ with tab2:
                 
                 with col1:
                     total_pairs = len(affinity_df)
-                    st.metric("Product Pairs", f"{total_pairs:,}")
+                    st.metric("Product Pairs", format_number(total_pairs, include_decimals=False))
                 
                 with col2:
                     strong_pairs = len(affinity_df[affinity_df['AFFINITY_STRENGTH'].isin(['very_strong', 'strong'])])
-                    st.metric("Strong Affinities", f"{strong_pairs:,}")
+                    st.metric("Strong Affinities", format_number(strong_pairs, include_decimals=False))
                 
                 with col3:
                     avg_lift = affinity_df['LIFT'].mean()
@@ -234,7 +234,7 @@ with tab2:
                 
                 with col4:
                     cross_category = len(affinity_df[affinity_df['PRODUCT_A_CATEGORY'] != affinity_df['PRODUCT_B_CATEGORY']])
-                    st.metric("Cross-Category Pairs", f"{cross_category:,}")
+                    st.metric("Cross-Category Pairs", format_number(cross_category, include_decimals=False))
                 
                 st.divider()
                 
