@@ -224,8 +224,7 @@ class PartitionedStreamingApp:
             remaining_orders = num_orders - processed_orders
             current_batch_size = min(batch_size, remaining_orders)
             
-            retry_count = 0
-            # Generate data once outside retry loop to avoid regenerating on retry
+            # Generate data once for this batch
             order_batch: List[Order] = []
             all_order_items: List[OrderItem] = []
             
@@ -242,39 +241,62 @@ class PartitionedStreamingApp:
                 )
                 all_order_items.extend(order_items)
             
-            while retry_count <= max_retries:
+            # Insert orders and items separately with individual retry logic
+            # This prevents duplicate orders when items fail but orders succeed
+            orders_inserted = False
+            items_inserted = False
+            
+            # Step 1: Insert orders with retry
+            for retry_count in range(max_retries + 1):
                 try:
-                    # Insert both orders and order_items as atomic operation
-                    # If either fails, the ENTIRE batch will be retried
                     self.streaming_manager.insert_orders(order_batch)
-                    
-                    # Brief pause to allow order buffers to flush before inserting order_items
-                    # This reduces backpressure and prevents ReceiverSaturated errors
-                    time.sleep(0.1)
-                    
-                    self.streaming_manager.insert_order_items(all_order_items)
-                    
-                    # Success - break out of retry loop
-                    processed_orders += current_batch_size
-                    logger.info(
-                        f"Progress: {processed_orders}/{num_orders} orders streamed "
-                        f"({len(all_order_items)} order items)"
-                    )
+                    orders_inserted = True
                     break
-                    
                 except Exception as e:
-                    retry_count += 1
-                    if retry_count > max_retries:
+                    if retry_count >= max_retries:
                         logger.error(
-                            f"Failed to insert batch after {max_retries} retries at position {processed_orders}: {e}",
-                            exc_info=True,
+                            f"Failed to insert orders after {max_retries + 1} attempts: {e}",
+                            exc_info=True
                         )
                         raise
-                    else:
-                        logger.warning(
-                            f"Batch insert failed (attempt {retry_count}/{max_retries}), retrying: {e}"
+                    logger.warning(
+                        f"Orders insert failed (attempt {retry_count + 1}/{max_retries + 1}), retrying: {e}"
+                    )
+                    time.sleep(1 * (retry_count + 1))
+            
+            # Step 2: Brief pause before inserting items
+            time.sleep(0.1)
+            
+            # Step 3: Insert order_items with retry
+            for retry_count in range(max_retries + 1):
+                try:
+                    self.streaming_manager.insert_order_items(all_order_items)
+                    items_inserted = True
+                    break
+                except Exception as e:
+                    if retry_count >= max_retries:
+                        logger.error(
+                            f"Failed to insert order_items after {max_retries + 1} attempts: {e}",
+                            exc_info=True
                         )
-                        time.sleep(1 * retry_count)  # Exponential backoff
+                        # Items failed but orders succeeded - reconciliation will clean this up
+                        logger.warning(
+                            f"ATOMICITY VIOLATION: {len(order_batch)} orders inserted but "
+                            f"{len(all_order_items)} order_items failed. Reconciliation will clean up."
+                        )
+                        raise
+                    logger.warning(
+                        f"Order_items insert failed (attempt {retry_count + 1}/{max_retries + 1}), retrying: {e}"
+                    )
+                    time.sleep(1 * (retry_count + 1))
+            
+            # Both succeeded
+            if orders_inserted and items_inserted:
+                processed_orders += current_batch_size
+                logger.info(
+                    f"Progress: {processed_orders}/{num_orders} orders streamed "
+                    f"({len(all_order_items)} order items)"
+                )
         
         logger.info(
             f"Successfully streamed {num_orders} orders "

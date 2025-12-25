@@ -232,61 +232,72 @@ class PartitionedStreamingApp {
             int remainingOrders = numOrders - processedOrders;
             int currentBatchSize = Math.min(batchSize, remainingOrders);
             
-            int retryCount = 0;
-            while (retryCount <= maxRetries) {
+            // Generate data once for this batch
+            List<Order> orderBatch = new ArrayList<>(currentBatchSize);
+            List<OrderItem> allOrderItems = new ArrayList<>();
+            
+            for (int i = 0; i < currentBatchSize; i++) {
+                int customerId = DataGenerator.randomCustomerIdInRange(customerIdStart, customerIdEnd);
+                Order order = DataGenerator.generateOrder(customerId);
+                orderBatch.add(order);
+                
+                int itemCount = DataGenerator.randomItemCount();
+                List<OrderItem> orderItems = DataGenerator.generateOrderItems(order.getOrderId(), itemCount);
+                allOrderItems.addAll(orderItems);
+            }
+            
+            // Insert orders and items separately with individual retry logic
+            // This prevents duplicate orders when items fail but orders succeed
+            boolean ordersInserted = false;
+            boolean itemsInserted = false;
+            
+            // Step 1: Insert orders with retry
+            for (int retryCount = 0; retryCount <= maxRetries; retryCount++) {
                 try {
-                    List<Order> orderBatch = new ArrayList<>(currentBatchSize);
-                    List<OrderItem> allOrderItems = new ArrayList<>();
-                    
-                    for (int i = 0; i < currentBatchSize; i++) {
-                        int customerId = DataGenerator.randomCustomerIdInRange(customerIdStart, customerIdEnd);
-                        Order order = DataGenerator.generateOrder(customerId);
-                        orderBatch.add(order);
-                        
-                        int itemCount = DataGenerator.randomItemCount();
-                        List<OrderItem> orderItems = DataGenerator.generateOrderItems(order.getOrderId(), itemCount);
-                        allOrderItems.addAll(orderItems);
-                    }
-                    
-                    // Insert both orders and order_items - if either fails, both should fail
-                    try {
-                        streamingManager.insertOrders(orderBatch);
-                    } catch (Exception e) {
-                        logger.error("Failed to insert orders: {}", e.getMessage());
+                    streamingManager.insertOrders(orderBatch);
+                    ordersInserted = true;
+                    break;
+                } catch (Exception e) {
+                    if (retryCount >= maxRetries) {
+                        logger.error("Failed to insert orders after {} attempts: {}", 
+                                   maxRetries + 1, e.getMessage(), e);
                         throw e;
                     }
-                    
-                    // Brief pause to allow order buffers to flush before inserting order_items
-                    // This reduces backpressure and prevents ReceiverSaturated errors
-                    Thread.sleep(100);
-                    
-                    try {
-                        streamingManager.insertOrderItems(allOrderItems);
-                    } catch (Exception e) {
-                        logger.error("Failed to insert order_items after orders were inserted: {}", e.getMessage());
-                        logger.warn("ATOMICITY VIOLATION: {} orders were inserted but {} order items failed. This will cause data inconsistency.",
+                    logger.warn("Orders insert failed (attempt {}/{}), retrying: {}", 
+                               retryCount + 1, maxRetries + 1, e.getMessage());
+                    Thread.sleep(1000L * (retryCount + 1));
+                }
+            }
+            
+            // Step 2: Brief pause before inserting items
+            Thread.sleep(100);
+            
+            // Step 3: Insert order_items with retry
+            for (int retryCount = 0; retryCount <= maxRetries; retryCount++) {
+                try {
+                    streamingManager.insertOrderItems(allOrderItems);
+                    itemsInserted = true;
+                    break;
+                } catch (Exception e) {
+                    if (retryCount >= maxRetries) {
+                        logger.error("Failed to insert order_items after {} attempts: {}", 
+                                   maxRetries + 1, e.getMessage(), e);
+                        // Items failed but orders succeeded - reconciliation will clean this up
+                        logger.warn("ATOMICITY VIOLATION: {} orders inserted but {} order_items failed. Reconciliation will clean up.",
                                    orderBatch.size(), allOrderItems.size());
                         throw e;
                     }
-                    
-                    // Success - break out of retry loop
-                    processedOrders += currentBatchSize;
-                    logger.info("Progress: {}/{} orders streamed ({} order items)", 
-                               processedOrders, numOrders, allOrderItems.size());
-                    break;
-                    
-                } catch (Exception e) {
-                    retryCount++;
-                    if (retryCount > maxRetries) {
-                        logger.error("Failed to insert batch after {} retries at position {}: {}", 
-                                   maxRetries, processedOrders, e.getMessage(), e);
-                        throw e;
-                    } else {
-                        logger.warn("Batch insert failed (attempt {}/{}), retrying: {}", 
-                                   retryCount, maxRetries, e.getMessage());
-                        Thread.sleep(1000L * retryCount);  // Exponential backoff
-                    }
+                    logger.warn("Order_items insert failed (attempt {}/{}), retrying: {}", 
+                               retryCount + 1, maxRetries + 1, e.getMessage());
+                    Thread.sleep(1000L * (retryCount + 1));
                 }
+            }
+            
+            // Both succeeded
+            if (ordersInserted && itemsInserted) {
+                processedOrders += currentBatchSize;
+                logger.info("Progress: {}/{} orders streamed ({} order items)", 
+                           processedOrders, numOrders, allOrderItems.size());
             }
         }
 
