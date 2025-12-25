@@ -5,12 +5,38 @@ from plotly.subplots import make_subplots
 from shared import get_session, show_header, format_number
 import time
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 show_header()
 st.subheader("🚀 Next-Gen Warehouse Performance")
 st.divider()
 
 session = get_session()
+
+def disable_query_cache_with_retry(session, max_retries=3, delay_seconds=0.5):
+    """
+    Attempt to disable query result cache with retry logic.
+    This handles transient 'ALTER SESSION not supported in stored procedure' errors.
+    """
+    for attempt in range(max_retries):
+        try:
+            session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            if "ALTER_SESSION" in error_msg or "90236" in error_msg:
+                if attempt < max_retries - 1:
+                    logger.warning(f"ALTER SESSION attempt {attempt + 1} failed (transient error), retrying in {delay_seconds}s...")
+                    time.sleep(delay_seconds)
+                    continue
+                else:
+                    logger.warning(f"ALTER SESSION failed after {max_retries} attempts, continuing without disabling cache")
+                    return False
+            else:
+                raise
+    return False
 
 # Initialize session state
 if 'pipeline_results' not in st.session_state:
@@ -114,7 +140,9 @@ if run_both:
             try:
                 session.sql("CALL AUTOMATED_INTELLIGENCE.staging.restore_discount_snapshot()").collect()
                 session.sql(f"USE WAREHOUSE {warehouse}").collect()
-                session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
+                
+                # Disable cache with retry logic (handles transient errors)
+                disable_query_cache_with_retry(session)
                 
                 # Run actual workload once to compile stored procedures
                 session.sql("CALL AUTOMATED_INTELLIGENCE.staging.merge_staging_to_raw()").collect()
@@ -134,8 +162,8 @@ if run_both:
                 # Set warehouse for this session
                 session.sql(f"USE WAREHOUSE {warehouse}").collect()
                 
-                # Clear query result cache to ensure fair comparison
-                session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
+                # Clear query result cache to ensure fair comparison (with retry logic)
+                disable_query_cache_with_retry(session)
                 
                 # Run MERGE
                 merge_start = time.time()
