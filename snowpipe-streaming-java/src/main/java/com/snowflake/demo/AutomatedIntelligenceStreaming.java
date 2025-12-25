@@ -61,6 +61,10 @@ public class AutomatedIntelligenceStreaming {
                         throw e;
                     }
                     
+                    // Brief pause to allow order buffers to flush before inserting order_items
+                    // This reduces backpressure and prevents ReceiverSaturated errors
+                    Thread.sleep(100);
+                    
                     try {
                         streamingManager.insertOrderItems(allOrderItems);
                     } catch (Exception e) {

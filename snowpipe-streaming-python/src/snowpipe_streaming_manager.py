@@ -1,11 +1,13 @@
 import logging
 from typing import List, Dict, Any, Optional
 from snowflake.ingest.streaming import StreamingIngestClient, StreamingIngestChannel
+from snowflake.ingest.streaming.streaming_ingest_error import StreamingIngestError
 from models import Order, OrderItem
 from config_manager import ConfigManager
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +128,9 @@ class SnowpipeStreamingManager:
         
         rows = [order.to_dict() for order in orders]
         
-        self.orders_channel.append_rows(rows, start_offset, end_offset)
+        self._insert_with_backpressure_retry(
+            self.orders_channel, rows, start_offset, end_offset, "orders"
+        )
         logger.debug(
             f"Inserted {len(orders)} orders (offset range: {start_offset} to {end_offset})"
         )
@@ -140,11 +144,77 @@ class SnowpipeStreamingManager:
         
         rows = [item.to_dict() for item in items]
         
-        self.order_items_channel.append_rows(rows, start_offset, end_offset)
+        self._insert_with_backpressure_retry(
+            self.order_items_channel, rows, start_offset, end_offset, "order_items"
+        )
         logger.debug(
             f"Inserted {len(items)} order items (offset range: {start_offset} to {end_offset})"
         )
 
+    def _insert_with_backpressure_retry(
+        self,
+        channel: StreamingIngestChannel,
+        rows: List[Dict[str, Any]],
+        start_offset: str,
+        end_offset: str,
+        data_type: str,
+        max_retries: int = 5,
+        initial_delay: float = 1.0,
+        max_delay: float = 30.0,
+    ) -> None:
+        """
+        Insert rows with exponential backoff retry for ReceiverSaturated errors.
+        
+        Args:
+            channel: The streaming channel to insert into
+            rows: Data rows to insert
+            start_offset: Starting offset token
+            end_offset: Ending offset token
+            data_type: Description of data type (for logging)
+            max_retries: Maximum number of retry attempts
+            initial_delay: Initial delay in seconds before first retry
+            max_delay: Maximum delay between retries
+        """
+        delay = initial_delay
+        
+        for attempt in range(max_retries):
+            try:
+                channel.append_rows(rows, start_offset, end_offset)
+                
+                if attempt > 0:
+                    logger.info(
+                        f"Successfully inserted {len(rows)} {data_type} after {attempt + 1} attempts"
+                    )
+                return
+                
+            except StreamingIngestError as e:
+                error_msg = str(e)
+                
+                # Check for ReceiverSaturated (HTTP 429) backpressure errors
+                if "ReceiverSaturated" in error_msg or "429" in error_msg:
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"Backpressure detected for {data_type} (attempt {attempt + 1}/{max_retries}): "
+                            f"Channel buffers full. Retrying in {delay:.1f}s..."
+                        )
+                        time.sleep(delay)
+                        delay = min(delay * 2, max_delay)  # Exponential backoff
+                        continue
+                    else:
+                        logger.error(
+                            f"Failed to insert {len(rows)} {data_type} after {max_retries} attempts: "
+                            f"Channel buffers remain saturated"
+                        )
+                        raise
+                else:
+                    # Non-backpressure error, re-raise immediately
+                    logger.error(f"Unexpected error inserting {data_type}: {error_msg}")
+                    raise
+            
+            except Exception as e:
+                logger.error(f"Unexpected error type inserting {data_type}: {type(e).__name__}: {e}")
+                raise
+    
     def get_latest_order_offset(self) -> Optional[str]:
         return self.orders_channel.get_latest_committed_offset_token()
 
