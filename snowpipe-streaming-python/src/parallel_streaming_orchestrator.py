@@ -114,11 +114,14 @@ class ParallelStreamingOrchestrator:
                     reconciliation_stats = reconciliation_manager.reconcile_and_cleanup()
                     
                     # Report if any inconsistencies were found
-                    if reconciliation_stats["orphaned_orders_found"] > 0 or reconciliation_stats["orphaned_items_found"] > 0:
+                    if (reconciliation_stats["orphaned_orders_found"] > 0 or 
+                        reconciliation_stats["orphaned_items_found"] > 0 or
+                        reconciliation_stats["duplicate_orders_found"] > 0):
                         logger.warning(
                             f"⚠️  Data inconsistencies detected and cleaned: "
                             f"{reconciliation_stats['orphaned_orders_deleted']:,} orphaned orders, "
-                            f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items"
+                            f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items, "
+                            f"{reconciliation_stats['duplicate_orders_deleted']:,} duplicate orders"
                         )
                     else:
                         logger.info("✅ No data inconsistencies found - ingestion was atomic")

@@ -78,6 +78,8 @@ public class ReconciliationManager {
         stats.put("orphanedOrdersDeleted", 0L);
         stats.put("orphanedItemsFound", 0L);
         stats.put("orphanedItemsDeleted", 0L);
+        stats.put("duplicateOrdersFound", 0L);
+        stats.put("duplicateOrdersDeleted", 0L);
         stats.put("finalOrdersCount", 0L);
         stats.put("finalItemsCount", 0L);
         
@@ -145,7 +147,53 @@ public class ReconciliationManager {
                 logger.info("✓ No orphaned order_items found");
             }
             
-            // 3. Get final counts
+            // 3. Check and delete duplicate orders (keeping only one copy)
+            logger.info("Checking for duplicate order_ids...");
+            // First, count duplicates
+            String checkDuplicatesSql = String.format(
+                "SELECT COUNT(*) - COUNT(DISTINCT order_id) as duplicate_count " +
+                "FROM %s.%s.%s",
+                database, schema, ordersTable
+            );
+            
+            ResultSet rs = stmt.executeQuery(checkDuplicatesSql);
+            if (rs.next()) {
+                stats.put("duplicateOrdersFound", rs.getLong(1));
+            }
+            rs.close();
+            
+            if (stats.get("duplicateOrdersFound") > 0) {
+                logger.warn("Found {} duplicate orders. Deleting duplicates...", 
+                    String.format("%,d", stats.get("duplicateOrdersFound")));
+                
+                // Delete duplicates, keeping only the first occurrence of each order_id
+                String deleteDuplicatesSql = String.format(
+                    "DELETE FROM %s.%s.%s " +
+                    "WHERE (order_id, order_date, total_amount) IN (" +
+                    "  SELECT order_id, order_date, total_amount " +
+                    "  FROM (" +
+                    "    SELECT " +
+                    "      order_id, " +
+                    "      order_date, " +
+                    "      total_amount, " +
+                    "      ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY order_date) as rn " +
+                    "    FROM %s.%s.%s" +
+                    "  ) " +
+                    "  WHERE rn > 1" +
+                    ")",
+                    database, schema, ordersTable,
+                    database, schema, ordersTable
+                );
+                
+                int deletedDuplicates = stmt.executeUpdate(deleteDuplicatesSql);
+                stats.put("duplicateOrdersDeleted", (long) deletedDuplicates);
+                logger.info("Deleted {} duplicate order records", 
+                    String.format("%,d", deletedDuplicates));
+            } else {
+                logger.info("✓ No duplicate orders found");
+            }
+            
+            // 4. Get final counts
             rs = stmt.executeQuery(String.format("SELECT COUNT(*) FROM %s.%s.%s", 
                 database, schema, ordersTable));
             if (rs.next()) {
@@ -166,11 +214,15 @@ public class ReconciliationManager {
             logger.info("Orphaned orders deleted: {}", String.format("%,d", stats.get("orphanedOrdersDeleted")));
             logger.info("Orphaned items found: {}", String.format("%,d", stats.get("orphanedItemsFound")));
             logger.info("Orphaned items deleted: {}", String.format("%,d", stats.get("orphanedItemsDeleted")));
+            logger.info("Duplicate orders found: {}", String.format("%,d", stats.get("duplicateOrdersFound")));
+            logger.info("Duplicate orders deleted: {}", String.format("%,d", stats.get("duplicateOrdersDeleted")));
             logger.info("Final orders count: {}", String.format("%,d", stats.get("finalOrdersCount")));
             logger.info("Final order_items count: {}", String.format("%,d", stats.get("finalItemsCount")));
             
-            if (stats.get("orphanedOrdersFound") == 0 && stats.get("orphanedItemsFound") == 0) {
-                logger.info("✅ Data is consistent - no orphaned records found");
+            if (stats.get("orphanedOrdersFound") == 0 && 
+                stats.get("orphanedItemsFound") == 0 && 
+                stats.get("duplicateOrdersFound") == 0) {
+                logger.info("✅ Data is consistent - no issues found");
             } else {
                 logger.info("✅ Reconciliation completed - data is now consistent");
             }

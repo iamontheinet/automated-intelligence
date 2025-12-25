@@ -66,6 +66,8 @@ class ReconciliationManager:
                 "orphaned_orders_deleted": 0,
                 "orphaned_items_found": 0,
                 "orphaned_items_deleted": 0,
+                "duplicate_orders_found": 0,
+                "duplicate_orders_deleted": 0,
                 "final_orders_count": 0,
                 "final_items_count": 0,
             }
@@ -118,7 +120,43 @@ class ReconciliationManager:
             else:
                 logger.info("✓ No orphaned order_items found")
             
-            # 3. Get final counts
+            # 3. Check and delete duplicate orders (keeping only one copy)
+            logger.info("Checking for duplicate order_ids...")
+            # First, count duplicates
+            check_duplicates_sql = f"""
+            SELECT COUNT(*) - COUNT(DISTINCT order_id) as duplicate_count
+            FROM {database}.{schema}.{orders_table}
+            """
+            cursor.execute(check_duplicates_sql)
+            stats["duplicate_orders_found"] = cursor.fetchone()[0]
+            
+            if stats["duplicate_orders_found"] > 0:
+                logger.warning(
+                    f"Found {stats['duplicate_orders_found']:,} duplicate orders. Deleting duplicates..."
+                )
+                # Delete duplicates, keeping only the first occurrence of each order_id
+                delete_duplicates_sql = f"""
+                DELETE FROM {database}.{schema}.{orders_table}
+                WHERE (order_id, order_date, total_amount) IN (
+                    SELECT order_id, order_date, total_amount
+                    FROM (
+                        SELECT 
+                            order_id,
+                            order_date,
+                            total_amount,
+                            ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY order_date) as rn
+                        FROM {database}.{schema}.{orders_table}
+                    )
+                    WHERE rn > 1
+                )
+                """
+                cursor.execute(delete_duplicates_sql)
+                stats["duplicate_orders_deleted"] = cursor.rowcount
+                logger.info(f"Deleted {stats['duplicate_orders_deleted']:,} duplicate order records")
+            else:
+                logger.info("✓ No duplicate orders found")
+            
+            # 4. Get final counts
             cursor.execute(f"SELECT COUNT(*) FROM {database}.{schema}.{orders_table}")
             stats["final_orders_count"] = cursor.fetchone()[0]
             
@@ -130,11 +168,15 @@ class ReconciliationManager:
             logger.info(f"Orphaned orders deleted: {stats['orphaned_orders_deleted']:,}")
             logger.info(f"Orphaned items found: {stats['orphaned_items_found']:,}")
             logger.info(f"Orphaned items deleted: {stats['orphaned_items_deleted']:,}")
+            logger.info(f"Duplicate orders found: {stats['duplicate_orders_found']:,}")
+            logger.info(f"Duplicate orders deleted: {stats['duplicate_orders_deleted']:,}")
             logger.info(f"Final orders count: {stats['final_orders_count']:,}")
             logger.info(f"Final order_items count: {stats['final_items_count']:,}")
             
-            if stats["orphaned_orders_found"] == 0 and stats["orphaned_items_found"] == 0:
-                logger.info("✅ Data is consistent - no orphaned records found")
+            if (stats["orphaned_orders_found"] == 0 and 
+                stats["orphaned_items_found"] == 0 and 
+                stats["duplicate_orders_found"] == 0):
+                logger.info("✅ Data is consistent - no issues found")
             else:
                 logger.info("✅ Reconciliation completed - data is now consistent")
             
