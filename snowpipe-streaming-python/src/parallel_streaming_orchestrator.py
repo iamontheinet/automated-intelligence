@@ -103,30 +103,34 @@ class ParallelStreamingOrchestrator:
                 logger.info(f"Failed instances: {failed_instances}")
                 logger.info(f"Total orders generated: {total_orders_generated}")
                 
-                # Run reconciliation to clean up any orphaned records
-                logger.info("\n" + "="*60)
-                logger.info("Starting post-ingestion reconciliation...")
-                logger.info("="*60)
-                
-                try:
-                    reconciliation_manager = ReconciliationManager(config)
-                    reconciliation_stats = reconciliation_manager.reconcile_and_cleanup()
+                # Only run reconciliation if at least some instances succeeded
+                # (Don't clean up data if current ingestion completely failed)
+                if successful_instances > 0:
+                    logger.info("\n" + "="*60)
+                    logger.info("Starting post-ingestion reconciliation...")
+                    logger.info("="*60)
                     
-                    # Report if any inconsistencies were found
-                    if reconciliation_stats["orphaned_orders_found"] > 0 or reconciliation_stats["orphaned_items_found"] > 0:
-                        logger.warning(
-                            f"⚠️  Data inconsistencies detected and cleaned: "
-                            f"{reconciliation_stats['orphaned_orders_deleted']:,} orphaned orders, "
-                            f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items"
-                        )
-                    else:
-                        logger.info("✅ No data inconsistencies found - ingestion was atomic")
+                    try:
+                        reconciliation_manager = ReconciliationManager(config)
+                        reconciliation_stats = reconciliation_manager.reconcile_and_cleanup()
                         
-                except Exception as e:
-                    logger.error(f"Reconciliation failed: {e}", exc_info=True)
-                    logger.warning("⚠️  Reconciliation failed but ingestion completed. Manual cleanup may be needed.")
-                
-                logger.info("="*60 + "\n")
+                        # Report if any inconsistencies were found
+                        if reconciliation_stats["orphaned_orders_found"] > 0 or reconciliation_stats["orphaned_items_found"] > 0:
+                            logger.warning(
+                                f"⚠️  Data inconsistencies detected and cleaned: "
+                                f"{reconciliation_stats['orphaned_orders_deleted']:,} orphaned orders, "
+                                f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items"
+                            )
+                        else:
+                            logger.info("✅ No data inconsistencies found - ingestion was atomic")
+                            
+                    except Exception as e:
+                        logger.error(f"Reconciliation failed: {e}", exc_info=True)
+                        logger.warning("⚠️  Reconciliation failed but ingestion completed. Manual cleanup may be needed.")
+                    
+                    logger.info("="*60 + "\n")
+                else:
+                    logger.warning("⚠️  Skipping reconciliation - all instances failed, no new data inserted")
                 
                 if failed_instances > 0:
                     sys.exit(1)
