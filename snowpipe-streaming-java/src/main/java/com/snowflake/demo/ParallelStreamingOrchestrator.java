@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class ParallelStreamingOrchestrator {
@@ -89,6 +90,33 @@ public class ParallelStreamingOrchestrator {
             logger.info("Successful instances: {}/{}", successfulInstances, numInstances);
             logger.info("Failed instances: {}", failedInstances);
             logger.info("Total orders generated: {}", totalOrdersGenerated);
+
+            // Run reconciliation to clean up any orphaned records
+            logger.info("\n" + "=".repeat(60));
+            logger.info("Starting post-ingestion reconciliation...");
+            logger.info("=".repeat(60));
+            
+            try {
+                ReconciliationManager reconciliationManager = new ReconciliationManager(config);
+                Map<String, Long> reconciliationStats = reconciliationManager.reconcileAndCleanup();
+                
+                // Report if any inconsistencies were found
+                if (reconciliationStats.get("orphanedOrdersFound") > 0 || 
+                    reconciliationStats.get("orphanedItemsFound") > 0) {
+                    logger.warn(
+                        "⚠️  Data inconsistencies detected and cleaned: {} orphaned orders, {} orphaned order_items",
+                        String.format("%,d", reconciliationStats.get("orphanedOrdersDeleted")),
+                        String.format("%,d", reconciliationStats.get("orphanedItemsDeleted"))
+                    );
+                } else {
+                    logger.info("✅ No data inconsistencies found - ingestion was atomic");
+                }
+            } catch (Exception e) {
+                logger.error("Reconciliation failed: {}", e.getMessage(), e);
+                logger.warn("⚠️  Reconciliation failed but ingestion completed. Manual cleanup may be needed.");
+            }
+            
+            logger.info("=".repeat(60) + "\n");
 
             if (failedInstances > 0) {
                 System.exit(1);

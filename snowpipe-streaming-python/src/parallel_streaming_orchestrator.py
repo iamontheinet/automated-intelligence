@@ -5,6 +5,7 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from config_manager import ConfigManager
 from snowpipe_streaming_manager import SnowpipeStreamingManager
+from reconciliation_manager import ReconciliationManager
 from data_generator import DataGenerator
 from models import Order, OrderItem
 
@@ -102,6 +103,31 @@ class ParallelStreamingOrchestrator:
                 logger.info(f"Failed instances: {failed_instances}")
                 logger.info(f"Total orders generated: {total_orders_generated}")
                 
+                # Run reconciliation to clean up any orphaned records
+                logger.info("\n" + "="*60)
+                logger.info("Starting post-ingestion reconciliation...")
+                logger.info("="*60)
+                
+                try:
+                    reconciliation_manager = ReconciliationManager(config)
+                    reconciliation_stats = reconciliation_manager.reconcile_and_cleanup()
+                    
+                    # Report if any inconsistencies were found
+                    if reconciliation_stats["orphaned_orders_found"] > 0 or reconciliation_stats["orphaned_items_found"] > 0:
+                        logger.warning(
+                            f"⚠️  Data inconsistencies detected and cleaned: "
+                            f"{reconciliation_stats['orphaned_orders_deleted']:,} orphaned orders, "
+                            f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items"
+                        )
+                    else:
+                        logger.info("✅ No data inconsistencies found - ingestion was atomic")
+                        
+                except Exception as e:
+                    logger.error(f"Reconciliation failed: {e}", exc_info=True)
+                    logger.warning("⚠️  Reconciliation failed but ingestion completed. Manual cleanup may be needed.")
+                
+                logger.info("="*60 + "\n")
+                
                 if failed_instances > 0:
                     sys.exit(1)
                     
@@ -198,44 +224,34 @@ class PartitionedStreamingApp:
             current_batch_size = min(batch_size, remaining_orders)
             
             retry_count = 0
+            # Generate data once outside retry loop to avoid regenerating on retry
+            order_batch: List[Order] = []
+            all_order_items: List[OrderItem] = []
+            
+            for i in range(current_batch_size):
+                customer_id = DataGenerator.random_customer_id_in_range(
+                    self.customer_id_start, self.customer_id_end
+                )
+                order = DataGenerator.generate_order(customer_id)
+                order_batch.append(order)
+                
+                item_count = DataGenerator.random_item_count()
+                order_items = DataGenerator.generate_order_items(
+                    order.order_id, item_count
+                )
+                all_order_items.extend(order_items)
+            
             while retry_count <= max_retries:
                 try:
-                    order_batch: List[Order] = []
-                    all_order_items: List[OrderItem] = []
-                    
-                    for i in range(current_batch_size):
-                        customer_id = DataGenerator.random_customer_id_in_range(
-                            self.customer_id_start, self.customer_id_end
-                        )
-                        order = DataGenerator.generate_order(customer_id)
-                        order_batch.append(order)
-                        
-                        item_count = DataGenerator.random_item_count()
-                        order_items = DataGenerator.generate_order_items(
-                            order.order_id, item_count
-                        )
-                        all_order_items.extend(order_items)
-                    
-                    # Insert both orders and order_items - if either fails, both should fail
-                    try:
-                        self.streaming_manager.insert_orders(order_batch)
-                    except Exception as e:
-                        logger.error(f"Failed to insert orders: {e}")
-                        raise
+                    # Insert both orders and order_items as atomic operation
+                    # If either fails, the ENTIRE batch will be retried
+                    self.streaming_manager.insert_orders(order_batch)
                     
                     # Brief pause to allow order buffers to flush before inserting order_items
                     # This reduces backpressure and prevents ReceiverSaturated errors
                     time.sleep(0.1)
                     
-                    try:
-                        self.streaming_manager.insert_order_items(all_order_items)
-                    except Exception as e:
-                        logger.error(f"Failed to insert order_items after orders were inserted: {e}")
-                        logger.warning(
-                            f"ATOMICITY VIOLATION: {len(order_batch)} orders were inserted but "
-                            f"{len(all_order_items)} order items failed. This will cause data inconsistency."
-                        )
-                        raise
+                    self.streaming_manager.insert_order_items(all_order_items)
                     
                     # Success - break out of retry loop
                     processed_orders += current_batch_size

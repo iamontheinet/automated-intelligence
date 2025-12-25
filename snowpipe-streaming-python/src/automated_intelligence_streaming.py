@@ -4,6 +4,7 @@ import time
 from typing import List
 from config_manager import ConfigManager
 from snowpipe_streaming_manager import SnowpipeStreamingManager
+from reconciliation_manager import ReconciliationManager
 from data_generator import DataGenerator
 from models import Order, OrderItem
 
@@ -137,6 +138,31 @@ def main():
         
         logger.info("Waiting 5 seconds for final data flush...")
         time.sleep(5)
+        
+        # Run reconciliation to clean up any orphaned records
+        logger.info("\n" + "="*60)
+        logger.info("Starting post-ingestion reconciliation...")
+        logger.info("="*60)
+        
+        try:
+            reconciliation_manager = ReconciliationManager(config)
+            reconciliation_stats = reconciliation_manager.reconcile_and_cleanup()
+            
+            # Report if any inconsistencies were found
+            if reconciliation_stats["orphaned_orders_found"] > 0 or reconciliation_stats["orphaned_items_found"] > 0:
+                logger.warning(
+                    f"⚠️  Data inconsistencies detected and cleaned: "
+                    f"{reconciliation_stats['orphaned_orders_deleted']:,} orphaned orders, "
+                    f"{reconciliation_stats['orphaned_items_deleted']:,} orphaned order_items"
+                )
+            else:
+                logger.info("✅ No data inconsistencies found - ingestion was atomic")
+                
+        except Exception as e:
+            logger.error(f"Reconciliation failed: {e}", exc_info=True)
+            logger.warning("⚠️  Reconciliation failed but ingestion completed. Manual cleanup may be needed.")
+        
+        logger.info("="*60 + "\n")
         
         logger.info("Application completed successfully")
         
