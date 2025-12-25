@@ -4,6 +4,7 @@ import com.snowflake.ingest.streaming.SnowflakeStreamingIngestChannel;
 import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClient;
 import com.snowflake.ingest.streaming.SnowflakeStreamingIngestClientFactory;
 import com.snowflake.ingest.streaming.OpenChannelResult;
+import com.snowflake.ingest.utils.SFException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +157,7 @@ public class SnowpipeStreamingManager {
                 .map(Order::toMap)
                 .collect(Collectors.toList());
         
-        ordersChannel.appendRows(rows, startOffset, endOffset);
+        insertWithBackpressureRetry(ordersChannel, rows, startOffset, endOffset, "orders");
         logger.debug("Inserted {} orders (offset range: {} to {})", 
                     orders.size(), startOffset, endOffset);
     }
@@ -173,9 +174,69 @@ public class SnowpipeStreamingManager {
                 .map(OrderItem::toMap)
                 .collect(Collectors.toList());
         
-        orderItemsChannel.appendRows(rows, startOffset, endOffset);
+        insertWithBackpressureRetry(orderItemsChannel, rows, startOffset, endOffset, "order_items");
         logger.debug("Inserted {} order items (offset range: {} to {})", 
                     items.size(), startOffset, endOffset);
+    }
+
+    /**
+     * Insert rows with exponential backoff retry for ReceiverSaturated errors.
+     * 
+     * @param channel The streaming channel to insert into
+     * @param rows Data rows to insert
+     * @param startOffset Starting offset token
+     * @param endOffset Ending offset token
+     * @param dataType Description of data type (for logging)
+     */
+    private void insertWithBackpressureRetry(
+            SnowflakeStreamingIngestChannel channel,
+            List<Map<String, Object>> rows,
+            String startOffset,
+            String endOffset,
+            String dataType) throws Exception {
+        
+        int maxRetries = 5;
+        double delay = 1.0;  // Initial delay in seconds
+        double maxDelay = 30.0;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                channel.appendRows(rows, startOffset, endOffset);
+                
+                if (attempt > 0) {
+                    logger.info("Successfully inserted {} {} after {} attempts",
+                               rows.size(), dataType, attempt + 1);
+                }
+                return;
+                
+            } catch (SFException e) {
+                String errorMsg = e.getMessage();
+                
+                // Check for ReceiverSaturated (HTTP 429) backpressure errors
+                if (errorMsg.contains("ReceiverSaturated") || errorMsg.contains("429")) {
+                    if (attempt < maxRetries - 1) {
+                        logger.warn("Backpressure detected for {} (attempt {}/{}): " +
+                                   "Channel buffers full. Retrying in {:.1f}s...",
+                                   dataType, attempt + 1, maxRetries, delay);
+                        Thread.sleep((long) (delay * 1000));
+                        delay = Math.min(delay * 2, maxDelay);  // Exponential backoff
+                        continue;
+                    } else {
+                        logger.error("Failed to insert {} {} after {} attempts: " +
+                                    "Channel buffers remain saturated",
+                                    rows.size(), dataType, maxRetries);
+                        throw e;
+                    }
+                } else {
+                    // Non-backpressure error, re-throw immediately
+                    logger.error("Unexpected error inserting {}: {}", dataType, errorMsg);
+                    throw e;
+                }
+            } catch (Exception e) {
+                logger.error("Unexpected error type inserting {}: {}", dataType, e.getMessage());
+                throw e;
+            }
+        }
     }
 
     public String getLatestOrderOffset() {

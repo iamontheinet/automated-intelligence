@@ -69,6 +69,10 @@ class AutomatedIntelligenceStreaming:
                         logger.error(f"Failed to insert orders: {e}")
                         raise
                     
+                    # Brief pause to allow order buffers to flush before inserting order_items
+                    # This reduces backpressure and prevents ReceiverSaturated errors
+                    time.sleep(0.1)
+                    
                     try:
                         self.streaming_manager.insert_order_items(all_order_items)
                     except Exception as e:
