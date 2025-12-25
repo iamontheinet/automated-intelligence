@@ -91,84 +91,56 @@ public class ReconciliationManager {
             String ordersTable = schema.equalsIgnoreCase("STAGING") ? "ORDERS_STAGING" : "ORDERS";
             String orderItemsTable = schema.equalsIgnoreCase("STAGING") ? "ORDER_ITEMS_STAGING" : "ORDER_ITEMS";
             
-            // 1. Check for orphaned orders (orders without order_items)
+            // 1. Check and delete orphaned orders (orders without order_items)
+            // Use a single operation to ensure count matches delete
             logger.info("Checking for orphaned orders...");
-            String checkOrphanedOrdersSql = String.format(
-                "SELECT COUNT(DISTINCT o.order_id) " +
-                "FROM %s.%s.%s o " +
-                "LEFT JOIN %s.%s.%s oi ON o.order_id = oi.order_id " +
-                "WHERE oi.order_id IS NULL",
+            String deleteOrphanedOrdersSql = String.format(
+                "DELETE FROM %s.%s.%s " +
+                "WHERE order_id IN (" +
+                "  SELECT DISTINCT o.order_id " +
+                "  FROM %s.%s.%s o " +
+                "  LEFT JOIN %s.%s.%s oi ON o.order_id = oi.order_id " +
+                "  WHERE oi.order_id IS NULL" +
+                ")",
+                database, schema, ordersTable,
                 database, schema, ordersTable,
                 database, schema, orderItemsTable
             );
             
-            ResultSet rs = stmt.executeQuery(checkOrphanedOrdersSql);
-            if (rs.next()) {
-                stats.put("orphanedOrdersFound", rs.getLong(1));
-            }
-            rs.close();
+            int deletedOrders = stmt.executeUpdate(deleteOrphanedOrdersSql);
+            stats.put("orphanedOrdersDeleted", (long) deletedOrders);
+            stats.put("orphanedOrdersFound", (long) deletedOrders);
             
-            if (stats.get("orphanedOrdersFound") > 0) {
-                logger.warn("Found {} orphaned orders. Deleting...", 
-                    String.format("%,d", stats.get("orphanedOrdersFound")));
-                
-                String deleteOrphanedOrdersSql = String.format(
-                    "DELETE FROM %s.%s.%s " +
-                    "WHERE order_id IN (" +
-                    "  SELECT o.order_id " +
-                    "  FROM %s.%s.%s o " +
-                    "  LEFT JOIN %s.%s.%s oi ON o.order_id = oi.order_id " +
-                    "  WHERE oi.order_id IS NULL" +
-                    ")",
-                    database, schema, ordersTable,
-                    database, schema, ordersTable,
-                    database, schema, orderItemsTable
-                );
-                
-                int deletedOrders = stmt.executeUpdate(deleteOrphanedOrdersSql);
-                stats.put("orphanedOrdersDeleted", (long) deletedOrders);
-                logger.info("Deleted {} orphaned orders", String.format("%,d", deletedOrders));
+            if (deletedOrders > 0) {
+                logger.warn("Found and deleted {} orphaned orders", 
+                    String.format("%,d", deletedOrders));
             } else {
                 logger.info("✓ No orphaned orders found");
             }
             
-            // 2. Check for orphaned order_items (order_items without orders)
+            // 2. Check and delete orphaned order_items (order_items without orders)
+            // Use a single operation to ensure count matches delete
             logger.info("Checking for orphaned order_items...");
-            String checkOrphanedItemsSql = String.format(
-                "SELECT COUNT(DISTINCT oi.order_item_id) " +
-                "FROM %s.%s.%s oi " +
-                "LEFT JOIN %s.%s.%s o ON oi.order_id = o.order_id " +
-                "WHERE o.order_id IS NULL",
+            String deleteOrphanedItemsSql = String.format(
+                "DELETE FROM %s.%s.%s " +
+                "WHERE order_id IN (" +
+                "  SELECT DISTINCT oi.order_id " +
+                "  FROM %s.%s.%s oi " +
+                "  LEFT JOIN %s.%s.%s o ON oi.order_id = o.order_id " +
+                "  WHERE o.order_id IS NULL" +
+                ")",
+                database, schema, orderItemsTable,
                 database, schema, orderItemsTable,
                 database, schema, ordersTable
             );
             
-            rs = stmt.executeQuery(checkOrphanedItemsSql);
-            if (rs.next()) {
-                stats.put("orphanedItemsFound", rs.getLong(1));
-            }
-            rs.close();
+            int deletedItems = stmt.executeUpdate(deleteOrphanedItemsSql);
+            stats.put("orphanedItemsDeleted", (long) deletedItems);
+            stats.put("orphanedItemsFound", (long) deletedItems);
             
-            if (stats.get("orphanedItemsFound") > 0) {
-                logger.warn("Found {} orphaned order_items. Deleting...", 
-                    String.format("%,d", stats.get("orphanedItemsFound")));
-                
-                String deleteOrphanedItemsSql = String.format(
-                    "DELETE FROM %s.%s.%s " +
-                    "WHERE order_id IN (" +
-                    "  SELECT oi.order_id " +
-                    "  FROM %s.%s.%s oi " +
-                    "  LEFT JOIN %s.%s.%s o ON oi.order_id = o.order_id " +
-                    "  WHERE o.order_id IS NULL" +
-                    ")",
-                    database, schema, orderItemsTable,
-                    database, schema, orderItemsTable,
-                    database, schema, ordersTable
-                );
-                
-                int deletedItems = stmt.executeUpdate(deleteOrphanedItemsSql);
-                stats.put("orphanedItemsDeleted", (long) deletedItems);
-                logger.info("Deleted {} orphaned order_items", String.format("%,d", deletedItems));
+            if (deletedItems > 0) {
+                logger.warn("Found and deleted {} orphaned order_items", 
+                    String.format("%,d", deletedItems));
             } else {
                 logger.info("✓ No orphaned order_items found");
             }

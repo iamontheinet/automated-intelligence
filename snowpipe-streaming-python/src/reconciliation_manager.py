@@ -70,67 +70,51 @@ class ReconciliationManager:
                 "final_items_count": 0,
             }
             
-            # 1. Check for orphaned orders (orders without order_items)
+            # 1. Check and delete orphaned orders (orders without order_items)
+            # Use a single transaction to ensure count matches delete
             logger.info("Checking for orphaned orders...")
-            check_orphaned_orders_sql = f"""
-            SELECT COUNT(DISTINCT o.order_id)
-            FROM {database}.{schema}.{orders_table} o
-            LEFT JOIN {database}.{schema}.{order_items_table} oi 
-                ON o.order_id = oi.order_id
-            WHERE oi.order_id IS NULL
+            delete_orphaned_orders_sql = f"""
+            DELETE FROM {database}.{schema}.{orders_table}
+            WHERE order_id IN (
+                SELECT DISTINCT o.order_id
+                FROM {database}.{schema}.{orders_table} o
+                LEFT JOIN {database}.{schema}.{order_items_table} oi 
+                    ON o.order_id = oi.order_id
+                WHERE oi.order_id IS NULL
+            )
             """
-            cursor.execute(check_orphaned_orders_sql)
-            stats["orphaned_orders_found"] = cursor.fetchone()[0]
+            cursor.execute(delete_orphaned_orders_sql)
+            stats["orphaned_orders_deleted"] = cursor.rowcount
+            stats["orphaned_orders_found"] = stats["orphaned_orders_deleted"]
             
-            if stats["orphaned_orders_found"] > 0:
+            if stats["orphaned_orders_deleted"] > 0:
                 logger.warning(
-                    f"Found {stats['orphaned_orders_found']:,} orphaned orders. Deleting..."
+                    f"Found and deleted {stats['orphaned_orders_deleted']:,} orphaned orders"
                 )
-                delete_orphaned_orders_sql = f"""
-                DELETE FROM {database}.{schema}.{orders_table}
-                WHERE order_id IN (
-                    SELECT o.order_id
-                    FROM {database}.{schema}.{orders_table} o
-                    LEFT JOIN {database}.{schema}.{order_items_table} oi 
-                        ON o.order_id = oi.order_id
-                    WHERE oi.order_id IS NULL
-                )
-                """
-                cursor.execute(delete_orphaned_orders_sql)
-                stats["orphaned_orders_deleted"] = cursor.rowcount
-                logger.info(f"Deleted {stats['orphaned_orders_deleted']:,} orphaned orders")
             else:
                 logger.info("✓ No orphaned orders found")
             
-            # 2. Check for orphaned order_items (order_items without orders)
+            # 2. Check and delete orphaned order_items (order_items without orders)
+            # Use a single transaction to ensure count matches delete
             logger.info("Checking for orphaned order_items...")
-            check_orphaned_items_sql = f"""
-            SELECT COUNT(DISTINCT oi.order_item_id)
-            FROM {database}.{schema}.{order_items_table} oi
-            LEFT JOIN {database}.{schema}.{orders_table} o 
-                ON oi.order_id = o.order_id
-            WHERE o.order_id IS NULL
+            delete_orphaned_items_sql = f"""
+            DELETE FROM {database}.{schema}.{order_items_table}
+            WHERE order_id IN (
+                SELECT DISTINCT oi.order_id
+                FROM {database}.{schema}.{order_items_table} oi
+                LEFT JOIN {database}.{schema}.{orders_table} o 
+                    ON oi.order_id = o.order_id
+                WHERE o.order_id IS NULL
+            )
             """
-            cursor.execute(check_orphaned_items_sql)
-            stats["orphaned_items_found"] = cursor.fetchone()[0]
+            cursor.execute(delete_orphaned_items_sql)
+            stats["orphaned_items_deleted"] = cursor.rowcount
+            stats["orphaned_items_found"] = stats["orphaned_items_deleted"]
             
-            if stats["orphaned_items_found"] > 0:
+            if stats["orphaned_items_deleted"] > 0:
                 logger.warning(
-                    f"Found {stats['orphaned_items_found']:,} orphaned order_items. Deleting..."
+                    f"Found and deleted {stats['orphaned_items_deleted']:,} orphaned order_items"
                 )
-                delete_orphaned_items_sql = f"""
-                DELETE FROM {database}.{schema}.{order_items_table}
-                WHERE order_id IN (
-                    SELECT oi.order_id
-                    FROM {database}.{schema}.{order_items_table} oi
-                    LEFT JOIN {database}.{schema}.{orders_table} o 
-                        ON oi.order_id = o.order_id
-                    WHERE o.order_id IS NULL
-                )
-                """
-                cursor.execute(delete_orphaned_items_sql)
-                stats["orphaned_items_deleted"] = cursor.rowcount
-                logger.info(f"Deleted {stats['orphaned_items_deleted']:,} orphaned order_items")
             else:
                 logger.info("✓ No orphaned order_items found")
             
