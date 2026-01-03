@@ -18,8 +18,8 @@ live_ingestion_page = st.Page("pages/live_ingestion.py", title="Live Ingestion",
 pipeline_health_page = st.Page("pages/pipeline_health.py", title="Pipeline Health", icon="🏥", url_path="pipeline_health")
 query_performance_page = st.Page("pages/query_performance.py", title="Interactive vs Standard", icon="⚡", url_path="query_performance")
 warehouse_performance_page = st.Page("pages/data_pipeline.py", title="Gen 1 vs Gen 2", icon="🚀", url_path="warehouse_performance")
-ml_insights_page = st.Page("pages/ml_insights.py", title="Distributed ML", icon="🔮", url_path="ml_insights")
-customer_product_analytics_page = st.Page("pages/customer_product_analytics.py", title="Customer & Product Analytics", icon="📈", url_path="customer_product_analytics")
+ml_insights_page = st.Page("pages/ml_insights.py", title="GPU-Accelerated ML", icon="🔮", url_path="ml_insights")
+customer_product_analytics_page = st.Page("pages/customer_product_analytics.py", title="Product Analytics", icon="📈", url_path="customer_product_analytics")
 summary_page = st.Page("pages/summary.py", title="Summary", icon="📋", url_path="summary")
 
 # Create navigation with default page
