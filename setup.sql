@@ -125,6 +125,8 @@ CREATE SCHEMA IF NOT EXISTS automated_intelligence.dynamic_tables;
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.interactive;
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.semantic;
 CREATE SCHEMA IF NOT EXISTS automated_intelligence.models COMMENT = 'Schema for ML models registered via Snowflake Model Registry';
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.dbt_staging COMMENT = 'Schema for dbt staging models';
+CREATE SCHEMA IF NOT EXISTS automated_intelligence.dbt_analytics COMMENT = 'Schema for dbt analytical models';
 
 -- Create warehouse
 CREATE WAREHOUSE IF NOT EXISTS automated_intelligence_wh
