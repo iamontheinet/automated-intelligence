@@ -1,1 +1,1 @@
-/Users/ddesai/Apps/Snova/automated-intelligence/streamlit-dashboard/pages/query_performance.py
+/Users/ddesai/Apps/automated-intelligence/streamlit-dashboard/pages/query_performance.py
