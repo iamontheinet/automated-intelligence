@@ -4,6 +4,7 @@
 with order_items as (
     select
         order_id,
+        product_id,
         product_name,
         product_category
     from {{ ref('stg_order_items') }}
@@ -12,8 +13,10 @@ with order_items as (
 -- Self-join to find product pairs in same order
 product_pairs as (
     select
+        oi1.product_id as product_a_id,
         oi1.product_name as product_a_name,
         oi1.product_category as product_a_category,
+        oi2.product_id as product_b_id,
         oi2.product_name as product_b_name,
         oi2.product_category as product_b_category,
         oi1.order_id
@@ -26,16 +29,20 @@ product_pairs as (
 -- Aggregate pair statistics
 pair_statistics as (
     select
+        product_a_id,
         product_a_name,
         product_a_category,
+        product_b_id,
         product_b_name,
         product_b_category,
         count(distinct order_id) as times_bought_together,
         count(distinct order_id) * 1.0 as pair_frequency
     from product_pairs
     group by 
+        product_a_id,
         product_a_name,
         product_a_category,
+        product_b_id,
         product_b_name,
         product_b_category
 ),
