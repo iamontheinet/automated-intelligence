@@ -4,7 +4,9 @@ This directory contains setup scripts for **Demo 1: Gen2 Warehouse Performance**
 
 ## Purpose
 
-Sets up the staging pipeline and MERGE procedures needed to demonstrate Gen2 warehouse performance improvements (10-40% faster MERGE/UPDATE operations).
+Sets up the staging pipeline and MERGE procedures needed to demonstrate Gen2 warehouse performance characteristics for MERGE/UPDATE operations.
+
+**Note:** *Performance improvements vary by workload characteristics, data volume, and query patterns. Gen2 warehouses are optimized for MERGE/UPDATE/DELETE operations.*
 
 ## Files
 

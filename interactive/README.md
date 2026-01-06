@@ -6,27 +6,29 @@ This module demonstrates **Interactive Tables** and **Interactive Warehouses** -
 
 ### What This Demo Proves
 
-1. **Real-Time Pipeline**: Data flows from ingestion → transformation → serving with sub-5-minute lag (all native Snowflake)
-2. **High-Concurrency Performance**: 3-10x faster queries under load (100+ concurrent users)
+1. **Real-Time Pipeline**: Data flows from ingestion → transformation → serving (all native Snowflake)
+2. **High-Concurrency Performance**: Better query performance under concurrent load
 3. **Complete Native Stack**: No external cache, API database, or ETL tools needed
+
+**Note:** *Performance characteristics vary by account configuration, data volume, and concurrent load. Interactive Tables and Warehouses are designed for consistent low-latency queries under high concurrency.*
 
 ### Architecture Position
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  INGESTION LAYER                                                 │
-│  Snowpipe Streaming → Real-time data ingestion (seconds)        │
+│  Snowpipe Streaming → Real-time data ingestion                 │
 └──────────────────────────────────────────────────────────────────┘
                            ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │  TRANSFORMATION LAYER                                             │
-│  Dynamic Tables (3 tiers) → Incremental transformations (hours)  │
+│  Dynamic Tables (3 tiers) → Incremental transformations         │
 └──────────────────────────────────────────────────────────────────┘
                            ↓
 ┌──────────────────────────────────────────────────────────────────┐
 │  SERVING LAYER (THIS MODULE)                                      │
-│  Interactive Tables → Auto-refresh from Dynamic Tables (5 min)   │
-│  Interactive Warehouse → Sub-100ms queries at 100+ QPS           │
+│  Interactive Tables → Auto-refresh from Dynamic Tables          │
+│  Interactive Warehouse → Low-latency queries under high load    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,14 +77,12 @@ This module demonstrates **Interactive Tables** and **Interactive Warehouses** -
 - **Purpose**: Customer portals ("My Orders" page)
 - **Clustered by**: `customer_id`
 - **Query pattern**: Point lookups by customer
-- **Performance**: <100ms per query
 - **Use cases**: Customer self-service, account dashboards
 
 #### `order_lookup`
 - **Purpose**: Support/operations dashboards
 - **Clustered by**: `order_id`
 - **Query pattern**: Point lookups by order ID
-- **Performance**: <50ms per query
 - **Use cases**: Support agent tools, order tracking APIs
 
 ### 2. Interactive Warehouse
@@ -152,7 +152,7 @@ Based on 21.3M orders in dataset with 150 concurrent threads:
 | **Average** | 4,221 ms (4.2s) | 1,083 ms (1.1s) | **3.9x faster** |
 | **Consistency** | Variable (queuing) | Predictable | ✓ |
 
-**Key Insight**: Interactive warehouses maintain consistent sub-second median latency even with 150+ concurrent users, while standard warehouses show 4-7 second queries under load.
+**Key Insight**: Interactive warehouses maintain consistent low median latency even under high concurrent load, while standard warehouses show increased query times under load.
 
 ### Real-Time Pipeline Performance
 
@@ -175,7 +175,7 @@ WHERE customer_id = ?
 ORDER BY order_date DESC
 LIMIT 20;
 ```
-**Expected**: <100ms response, perfect for web/mobile apps
+**Expected**: Low latency, perfect for web/mobile apps
 
 ### 2. Support Dashboards
 ```sql
@@ -183,7 +183,7 @@ LIMIT 20;
 SELECT * FROM order_lookup
 WHERE order_id = ?;
 ```
-**Expected**: <50ms response, instant results
+**Expected**: Very low latency, instant results
 
 ### 3. Public APIs
 ```sql
@@ -193,7 +193,7 @@ SELECT
 FROM order_lookup
 WHERE order_id = ?;
 ```
-**Expected**: <80ms response, handles 100+ QPS
+**Expected**: Low latency, handles high QPS
 
 ### 4. Real-Time Monitoring
 ```sql
@@ -203,14 +203,14 @@ WHERE order_date >= DATEADD('hour', -1, CURRENT_TIMESTAMP())
   AND final_revenue > 1000
 ORDER BY order_date DESC;
 ```
-**Expected**: <200ms response, dashboard-ready
+**Expected**: Fast response, dashboard-ready
 
 ---
 
 ## 🎬 Demo Flow & Talking Points
 
 ### Opening (30 seconds)
-> "Today I'll show you how Snowflake Interactive Tables enable **real-time serving** at scale with **no external systems**. We'll stress-test with 150 concurrent users and see 3-10x faster queries."
+> "Today I'll show you how Snowflake Interactive Tables enable **real-time serving** at scale with **no external systems**. We'll stress-test with 150 concurrent users and demonstrate query performance patterns."
 
 ### Load Testing Demo (3-5 minutes)
 
@@ -250,7 +250,7 @@ python realtime_demo.py --generate-orders 50
 
 **The Solution**:
 Interactive Tables + Interactive Warehouses provide:
-- ✅ **Sub-second queries** (<100ms typical)
+- ✅ **Low-latency queries** under concurrent load
 - ✅ **High concurrency** (100+ QPS)
 - ✅ **Automatic refresh** from Dynamic Tables (5-minute lag)
 - ✅ **No external tools** (no Redis, no separate API database)
@@ -453,8 +453,8 @@ LIMIT 20;
 ## 🎯 Key Takeaways
 
 1. **Real-Time Pipeline**: 5-minute lag from ingestion to serving (all native)
-2. **High Performance**: 3-10x faster queries under concurrent load
-3. **Production-Ready**: <100ms latency for customer-facing apps
+2. **High Performance**: Better query performance under concurrent load
+3. **Production-Ready**: Low latency suitable for customer-facing apps
 4. **Simplified Stack**: No external cache/database needed
 5. **Use Cases**: Customer portals, support dashboards, public APIs
 

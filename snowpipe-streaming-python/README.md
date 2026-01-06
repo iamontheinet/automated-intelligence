@@ -6,7 +6,7 @@ Python implementation of real-time data ingestion using the Snowpipe Streaming P
 
 This application streams synthetic e-commerce data (customers, orders, and order items) directly into Snowflake tables using the high-performance Snowpipe Streaming Python SDK. It provides:
 
-- **Real-time ingestion** with 5-10 second end-to-end latency
+- **Real-time ingestion** with low end-to-end latency
 - **Exactly-once delivery** using offset tokens
 - **Parallel streaming** with multiple concurrent instances
 - **Resumable ingestion** from last committed offset
@@ -15,6 +15,8 @@ This application streams synthetic e-commerce data (customers, orders, and order
   - Premium: $500-$3000 orders, 10% discount rate (5-10% off), 3-8 items/order
   - Standard: $100-$800 orders, 40% discount rate (5-20% off), 2-5 items/order
   - Basic: $20-$300 orders, 50% discount rate (10-30% off), 1-3 items/order
+
+**Note:** *Performance varies by Snowflake account configuration, region, and network conditions.*
 
 ## Architecture
 
@@ -269,7 +271,7 @@ SELECT COUNT(*) FROM AUTOMATED_INTELLIGENCE.RAW.ORDER_ITEMS;
 ### No Data Appearing
 - Verify PIPE objects exist: `SHOW PIPES IN SCHEMA AUTOMATED_INTELLIGENCE.RAW;`
 - Check for errors: `SELECT * FROM TABLE(VALIDATE_PIPE_LOAD('ORDERS_PIPE', ...));`
-- Wait 5-10 seconds for data to be visible (normal latency)
+- Wait briefly for data to be visible (ingestion latency varies)
 
 ### Performance Issues
 - Increase `orders.batch.size` in config.properties

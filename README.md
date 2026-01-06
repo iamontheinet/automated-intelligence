@@ -25,7 +25,7 @@ All demos share the same foundation and work together to show an end-to-end data
 │  DEMO 1: INGESTION LAYER                                         │
 │  Snowpipe Streaming (Python/Java SDK) → Real-time ingestion     │
 │  • Single to parallel instances for horizontal scaling          │
-│  • Billion-scale ready: Linear horizontal scaling               │
+│  • High-scale ready: Linear horizontal scaling               │
 │  • Sub-second latency from generation to queryable              │
 └──────────────────────────────────────────────────────────────────┘
                            ↓
@@ -310,7 +310,7 @@ Choose demos based on your audience and time:
 
 | Demo | Duration | Best For | Key Takeaway |
 |------|----------|----------|--------------|
-| **1. Snowpipe Streaming** | 10-15 min | Real-time Engineers | Billion-scale ingestion |
+| **1. Snowpipe Streaming** | 10-15 min | Real-time Engineers | High-scale ingestion |
 | **2. Gen2 Warehouse Performance** | 10-15 min | Data Engineers, Performance Teams | Faster MERGE/UPDATE operations |
 | **3. Dynamic Tables** | 15-20 min | Data Engineers, Architects | Zero-maintenance pipelines |
 | **4. Interactive Tables** | 10-15 min | App Developers, Performance Engineers | Low-latency serving |
@@ -526,7 +526,7 @@ Interactive warehouses provide improved query performance under high concurrency
 
 ---
 
-### DEMO 1: Snowpipe Streaming - Billion-Scale Ingestion
+### DEMO 1: Snowpipe Streaming - High-Scale Ingestion
 
 **What it demonstrates:**
 - High-performance real-time ingestion
@@ -567,7 +567,7 @@ java ParallelStreamingOrchestrator <total-orders> <num-instances>
 - Single instance: Fast ingestion with low latency
 - Parallel instances: Linear scaling for high throughput
 - Large-scale: Horizontal scaling to handle massive volumes
-- Billion-scale: Achievable with sufficient parallel instances
+- Massive-scale: Achievable with sufficient parallel instances
 
 **See:** 
 - Python: `snowpipe-streaming-python/README.md` and `COMPARISON.md`
@@ -770,7 +770,7 @@ ORDER BY table_name;
 After running all demos, you've demonstrated:
 
 **Data Ingestion:**
-- ✅ Snowpipe Streaming: Sub-second latency, billion-scale ready, Python or Java
+- ✅ Snowpipe Streaming: Sub-second latency, massive-scale ready, Python or Java
 
 **Data Transformation:**
 - ✅ Gen2 Warehouses: Faster MERGE/UPDATE/DELETE operations
@@ -794,7 +794,7 @@ After running all demos, you've demonstrated:
 **Snowflake Capabilities Demonstrated:**
 - ✅ Fully native stack - no external systems required
 - ✅ Set-and-forget automation - minimal operational overhead
-- ✅ Linear scalability - from thousands to billions of records
+- ✅ Linear scalability - from thousands to millions of records
 - ✅ Enterprise-grade security - built into Snowflake
 - ✅ Natural language interface - business users query data without SQL
 

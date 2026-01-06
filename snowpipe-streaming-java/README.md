@@ -2,25 +2,26 @@
 
 This project implements real-time data ingestion using Snowflake's Snowpipe Streaming high-performance architecture. It enables continuous, low-latency streaming of orders and order items for existing customers in Snowflake.
 
-## 🚀 Billion-Scale Architecture
+## 🚀 High-Scale Architecture
 
-**Optimized for massive scale**: This implementation supports scaling from thousands to **1 billion orders** through:
-- **Bulk batch generation**: 10K-50K orders per API call (100x improvement over legacy)
+**Optimized for massive scale**: This implementation supports horizontal scaling through:
+- **Bulk batch generation**: Efficient batching per API call
 - **Horizontal scaling**: Parallel instances with customer partitioning and unique channels
 - **Throughput optimization**: Targets 10-16 MB compressed batches per Snowflake best practices
-- **Production-ready**: Validated at 50K orders/10 seconds (5 parallel instances), ready for billion-scale
+- **Production-ready**: Linear scaling with additional parallel instances
 
-### Performance Benchmarks
+### Scaling Characteristics
 
-| Scale | Single Instance | 5 Parallel Instances | Improvement |
-|-------|----------------|----------------------|-------------|
-| 10K orders | ~5 seconds | ~2 seconds | **5x faster** |
-| 50K orders | ~25 seconds | **~10 seconds** ✅ | **100x vs legacy** |
-| 100K orders | ~1 minute | ~20 seconds | **200x vs legacy** |
-| 1M orders | ~10 minutes | ~2 minutes | **500x vs legacy** |
-| 1B orders | N/A | 30-60 min (50 instances) | **Billion-scale ready** |
+**Note:** *Performance varies by Snowflake account region, warehouse size, network latency, and data volume. Use these examples to understand scaling patterns, not as performance guarantees.*
 
-**Legacy performance**: ~10 orders/second = 28 hours for 1M orders
+| Approach | Description | Key Benefit |
+|----------|-------------|-------------|
+| Single Instance | Basic ingestion pattern | Simple setup and testing |
+| 5 Parallel Instances | Customer ID partitioning | ~5x throughput vs single |
+| 10+ Parallel Instances | Extended partitioning | Linear scaling continues |
+| 50+ Parallel Instances | Massive-scale deployment | Production-grade throughput |
+
+**Scaling Pattern**: Each additional instance adds proportional throughput through independent channels and customer partitioning.
 
 ## Architecture
 
@@ -60,19 +61,18 @@ Java Application (Parallel - 5 Instances)
 
 ### Key Scaling Innovations
 
-1. **Bulk Batch Generation**: Generate 10K orders in memory → single `insertRows()` call
-   - Before: 100 orders × 100 API calls = 10,000 API calls for 10K orders
-   - After: 10,000 orders × 1 API call = **10,000x reduction**
+1. **Bulk Batch Generation**: Generate orders in memory → single `insertRows()` call
+   - Reduces API call overhead significantly
+   - More efficient network utilization
 
 2. **Horizontal Scaling**: Multiple parallel instances with unique channels
    - Each instance gets unique channel names (`_instance_0`, `_instance_1`, etc.)
    - Prevents `STALE_CONTINUATION_TOKEN_SEQUENCER` conflicts
-   - Linear scalability: 5 instances = 5x throughput
+   - Linear scalability pattern: N instances ≈ N× throughput
 
 3. **Customer Partitioning**: No data conflicts between instances
-   - Instance 0: Customers 1-4,000
-   - Instance 1: Customers 4,001-8,000
-   - etc.
+   - Each instance processes distinct customer ID ranges
+   - Example: Instance 0 handles customers 1-4,000, Instance 1 handles 4,001-8,000, etc.
 
 ### Offset Token Strategy
 
@@ -358,28 +358,27 @@ Note: Customers are not streamed; orders reference existing customers in the dat
 
 | Aspect | Stored Procedure | Snowpipe Streaming (Legacy) | Snowpipe Streaming (Optimized) |
 |--------|------------------|-----------------------------|---------------------------------|
-| **Latency** | Batch (on-demand) | 5-10 seconds | 5-10 seconds |
-| **Batch Size** | Bulk inserts | 100 orders | **10,000 orders** |
-| **Throughput** | Limited by warehouse | ~10 orders/sec | **5,000+ orders/sec (5 instances)** |
+| **Latency** | Batch (on-demand) | Low latency | Low latency |
+| **Batch Size** | Bulk inserts | Small batches | **Large batches** |
+| **Throughput** | Limited by warehouse | Limited throughput | **High throughput with scaling** |
 | **Horizontal Scaling** | No | No | **Yes (parallel instances)** |
 | **Channel Management** | N/A | Single channel | **Unique channels per instance** |
-| **Use Case** | Batch generation | Small-scale streaming | **Billion-scale streaming** |
+| **Use Case** | Batch generation | Small-scale streaming | **Massive-scale streaming** |
 | **Cost Model** | Warehouse compute | Throughput ($/GB) | Throughput ($/GB) |
-| **Time to 1M Orders** | Minutes | ~28 hours | **~2 minutes (10 instances)** ✅ |
-| **Time to 1B Orders** | Hours | N/A (impractical) | **~30-60 minutes (50 instances)** |
+
+**Note:** *Performance varies by account region, network latency, and concurrent load. Focus on demonstrating horizontal scaling patterns.*
 
 ### Key Improvements Explained
 
-**100x Batch Improvement**:
-- Before: 100 orders per execution × insertRow() per order = 100 API calls
-- After: 10,000 orders per execution × single insertRows() = 1 API call
-- Result: 10,000x reduction in API overhead
+**Efficient Bulk Batching**:
+- Large batches significantly reduce API overhead
+- Single `insertRows()` call handles thousands of records
+- Result: Much more efficient processing
 
 **Linear Horizontal Scaling**:
-- 1 instance = ~10K orders/minute
-- 5 instances = ~50K orders/minute (validated: 50K in 10 seconds)
-- 10 instances = ~100K orders/minute
-- 50 instances = ~500K orders/minute = 1B orders in ~33 minutes
+- Each instance adds proportional throughput
+- Multiple instances can work in parallel without conflicts
+- Customer partitioning prevents data overlaps
 
 ## Best Practices
 
@@ -388,27 +387,26 @@ Note: Customers are not streamed; orders reference existing customers in the dat
 - **Bulk Batching**: Use 10K-50K orders per batch for optimal throughput
 - **Batch Size Target**: Aim for 10-16 MB compressed per `insertRows()` call
 - **Latency Tuning**: Set `max.client.lag=60s` (or higher) for better partition sizing
-- **Horizontal Scaling**: Deploy multiple parallel instances with customer partitioning for billion-scale
+- **Horizontal Scaling**: Deploy multiple parallel instances with customer partitioning for massive-scale ingestion
 - **Unique Channels**: Each parallel instance must use unique channel names (automatically handled by `ParallelStreamingOrchestrator`)
 - **Channel Reuse**: Keep channels open during active streaming (don't close after each batch)
 - **Customer Capacity**: Ensure sufficient existing customers (20K+ recommended) before streaming orders
 
 ### Scalability Guidelines
 
-| Target Orders | Instances | Configuration | Expected Time | Status |
-|---------------|-----------|---------------|---------------|--------|
-| 10K | 1 | Default | ~5 seconds | ✅ Validated |
-| 50K | 5 | Parallel orchestrator | ~10 seconds | ✅ Validated |
-| 100K | 5 | Parallel orchestrator | ~20 seconds | Ready |
-| 1M | 10 | Parallel orchestrator | ~2 minutes | Ready |
-| 10M | 20 | Parallel orchestrator | ~20 minutes | Ready |
-| 100M | 30-40 | Parallel + cloud infra | ~1 hour | Ready |
-| 1B | 50+ | Parallel + cloud infra | ~1-2 hours | Ready |
+| Target Orders | Instances | Configuration | Notes |
+|---------------|-----------|---------------|-------|
+| 10K | 1 | Default | Basic testing |
+| 50K | 5 | Parallel orchestrator | Validated pattern |
+| 100K+ | 5+ | Parallel orchestrator | Scale as needed |
+| Massive scale | 10-50+ | Parallel + cloud infra | Production deployment |
 
 **Validation Notes**:
-- 50K orders with 5 instances: Successful (5/5), 10 seconds, ~5,000 orders/second
+- 50K orders with 5 instances: Successful horizontal scaling pattern demonstrated
 - No channel conflicts with instance-specific naming
 - All instances completed successfully with unique channels
+
+**Note:** *Actual throughput varies by Snowflake account region, warehouse configuration, and network conditions.*
 
 ### Reliability
 
@@ -422,7 +420,7 @@ Note: Customers are not streamed; orders reference existing customers in the dat
 
 - **Client Architecture**: Uses separate clients per PIPE as required by high-performance SDK v1.1.0
 - **Appropriate Lag**: Higher lag = better file consolidation = lower query costs
-- **Bulk Operations**: `insertRows()` is 10-100x more cost-effective than `insertRow()`
+- **Bulk Operations**: `insertRows()` is significantly more cost-effective than `insertRow()`
 - **Combined Workloads**: Mixing batch and streaming reduces migration costs
 - **Channel Cost**: Charged per active client, NOT per channel (multiple instances share cost efficiency)
 
@@ -514,7 +512,7 @@ snowpipe-streaming/
 
 ### Production Deployment
 1. **Cloud Infrastructure**: Deploy ParallelStreamingOrchestrator on Kubernetes/Docker
-2. **Horizontal Scaling**: Start with 5-10 instances (validated), scale to 50+ for billion-scale
+2. **Horizontal Scaling**: Start with 5-10 instances (validated), scale to 50+ for massive-scale deployments
 3. **Monitoring**: Integrate with logging systems (CloudWatch, Datadog, etc.)
 4. **Error Handling**: Add retries, dead letter queues, alerting
 5. **Continuous Operation**: Schedule with Airflow, Kubernetes CronJobs, or similar
@@ -532,18 +530,18 @@ snowpipe-streaming/
 
 ## Implementation Summary
 
-### What Changed (100x Improvement)
+### What Changed (Optimized Architecture)
 
 1. **Bulk Batch Generation**
-   - Added `insertOrders(List<Order>)` to batch 10K orders per API call
+   - Added `insertOrders(List<Order>)` to batch large numbers of orders per API call
    - Refactored `AutomatedIntelligenceStreaming` to generate batches in memory
-   - 100x reduction in API calls (100 → 10,000 orders per batch)
+   - Significantly reduced API call overhead
 
 2. **Horizontal Scaling Framework**
    - Created `ParallelStreamingOrchestrator` for multi-instance orchestration
    - Unique channel names per instance (`_instance_0`, `_instance_1`, etc.)
    - Customer partitioning prevents data conflicts
-   - Validated: 5 instances × 10K orders = 50K in 10 seconds
+   - Validated: 5 parallel instances successfully demonstrated scaling pattern
 
 3. **Configuration Optimization**
    - `orders.batch.size=10000` (bulk generation size)

@@ -126,7 +126,7 @@ With typical e-commerce data and proper class imbalance handling:
 - **ROC-AUC**: 0.90-0.96 (Excellent)
 - **Churned Customer Recall**: 80-90% (catches most at-risk customers)
 - **Overall Accuracy**: 90-95%
-- **Training Time**: 1-3 minutes on Medium warehouse
+- **Training Time**: Varies by warehouse size and data volume
 - **Top Feature**: Customer tenure (90% importance)
 
 **Note:** High ROC-AUC with good recall indicates the model successfully balances precision and recall. Training happens on Ray cluster with distributed processing across multiple nodes.
