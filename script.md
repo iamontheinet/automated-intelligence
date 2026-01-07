@@ -1045,6 +1045,46 @@ ORDER BY CREATED_ON DESC;
 
 **See:** `ml-training/README.md` for detailed setup, configuration, and troubleshooting
 
+### Step 4: Deploy as Stored Procedure
+
+After training, deploy the model as a stored procedure for application integration:
+
+```bash
+cd ml-training
+snow sql -c <your-connection-name> -f product_recommendations_sproc.sql
+```
+
+**Test the stored procedure:**
+
+```sql
+-- Get recommendations for 2 low-engagement customers
+CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(2, 3, 'LOW_ENGAGEMENT');
+
+-- Expected output: Formatted string with customer IDs, products, and purchase probabilities
+```
+
+**Key Talking Points:**
+> "We've deployed the trained model as a stored procedure that can be called from applications, dashboards, or Cortex Agents.
+>
+> **Available Customer Segments:**
+> - LOW_ENGAGEMENT (3-5 orders): Upsell opportunities
+> - HIGH_VALUE_INACTIVE (high spenders, inactive 180+ days): Re-engagement
+> - NEW_CUSTOMERS (1-2 orders): Build loyalty
+> - AT_RISK (inactive 180+ days): Churn prevention
+> - HIGH_VALUE_ACTIVE (active high spenders): Retention
+>
+> **Formatted Output:** Returns a nicely formatted string (not a table) that's perfect for Cortex Agents and conversational AI applications.
+>
+> **Deterministic Results:** The procedure ensures consistent recommendations by ordering customers deterministically, making it production-ready for reliable campaign targeting."
+
+**Integration with Cortex Agents:**
+```
+Agent Tool Definition:
+- Function: get_product_recommendations(n_customers, n_products, segment)
+- Returns: Formatted recommendations with purchase probabilities
+- Use Cases: Conversational product recommendations, targeted marketing campaigns
+```
+
 ---
 
 # DEMO 7: Streamlit Dashboard - Real-Time Monitoring
@@ -1210,6 +1250,81 @@ CREATE OR REPLACE CORTEX AGENT AUTOMATED_INTELLIGENCE.SEMANTIC.ORDER_ANALYTICS_A
 > "The agent respects all row access policies and security controls - we'll see this in action in the Security & Governance demo next."
 
 **See:** `snowflake-intelligence/README.md` for detailed setup, semantic model customization, and troubleshooting
+
+### Advanced: Custom ML Tools for Agents
+
+**Powerful Feature: Extend agents with trained ML models as conversational tools**
+
+After training the product recommendation model (DEMO 6), integrate it as a custom agent tool:
+
+```bash
+# Deploy model as stored procedure (if not done in DEMO 6)
+cd ml-training
+snow sql -c <your-connection-name> -f product_recommendations_sproc.sql
+```
+
+**Agent Tool Definition (example):**
+```yaml
+tools:
+  - type: function
+    function:
+      name: get_product_recommendations
+      description: "ML-powered product recommendations by segment"
+      parameters:
+        segment:
+          type: string
+          enum: ["LOW_ENGAGEMENT", "HIGH_VALUE_INACTIVE", "NEW_CUSTOMERS", "AT_RISK"]
+      implementation:
+        sql: "CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(:n_customers, :n_products, :segment)"
+```
+
+**Demo Script:**
+
+**Ask the agent:**
+```
+"Show me product recommendations for low engagement customers"
+"Which products should I recommend to inactive high-value customers?"
+"Get 10 at-risk customers with their top 5 product recommendations"
+```
+
+**Expected Response:**
+```
+Product Recommendations for Low Engagement (3-5 orders) Segment
+======================================================================
+
+Customer ID: 10045
+----------------------------------------------------------------------
+  1. Powder Skis (Skis)
+     Purchase Probability: 97.1%
+
+Customer ID: 115561
+----------------------------------------------------------------------
+  1. All-Mountain Skis (Skis)
+     Purchase Probability: 90.9%
+
+These recommendations are based on ML predictions from our trained XGBoost 
+model, analyzing millions of customer-product interactions.
+```
+
+**Talking Points:**
+> "This is where Snowflake Intelligence becomes truly powerful - we're not just querying data, we're calling trained ML models through natural language.
+>
+> **What Just Happened:**
+> 1. User asked in plain English
+> 2. Agent identified the need for ML predictions
+> 3. Called our trained product recommendation model (deployed as stored procedure)
+> 4. Returned formatted results with purchase probabilities
+>
+> **No Code Required:** Business users can access ML insights without knowing:
+> - Stored procedure syntax
+> - Model deployment details
+> - Feature engineering
+>
+> **Production-Ready:** Same interface works for marketing campaigns, customer service, executive dashboards
+>
+> This is the future of AI-powered analytics - trained ML models accessible through conversation."
+
+**See:** `snowflake-intelligence/README.md` for complete agent tool integration guide
 
 ---
 

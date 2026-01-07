@@ -92,12 +92,97 @@ SELECT PARSE_JSON(
 )['results'] AS search_results;
 ```
 
+## Advanced: Custom ML Tools for Cortex Agents
+
+### Adding Trained ML Models as Agent Tools
+
+You can extend Cortex Agents with custom ML models deployed as stored procedures. This enables natural language access to ML-powered insights.
+
+**Example: Product Recommendations**
+
+After training the product recommendation model (see `ml-training/`), deploy it as a stored procedure:
+
+```bash
+cd ml-training
+snow sql -c dash-builder-si -f product_recommendations_sproc.sql
+```
+
+**Agent Tool Definition:**
+
+```yaml
+tools:
+  - type: function
+    function:
+      name: get_product_recommendations
+      description: "Get personalized product recommendations for customers in a specific segment using ML predictions"
+      parameters:
+        type: object
+        properties:
+          n_customers:
+            type: integer
+            description: "Number of customers to generate recommendations for"
+          n_products:
+            type: integer
+            description: "Number of product recommendations per customer"
+          segment:
+            type: string
+            enum: ["LOW_ENGAGEMENT", "HIGH_VALUE_INACTIVE", "NEW_CUSTOMERS", "AT_RISK", "HIGH_VALUE_ACTIVE"]
+            description: "Customer segment to target"
+        required: ["segment"]
+      implementation:
+        type: sql
+        sql: "CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(:n_customers, :n_products, :segment)"
+```
+
+**Sample Conversational Queries:**
+```
+User: "Show me product recommendations for low engagement customers"
+User: "Which products should I recommend to inactive high-value customers?"
+User: "Get me 10 customers from the at-risk segment with their top 5 products"
+```
+
+**Agent Response Example:**
+```
+Product Recommendations for Low Engagement (3-5 orders) Segment
+======================================================================
+
+Customer ID: 10045
+----------------------------------------------------------------------
+  1. Powder Skis (Skis)
+     Purchase Probability: 97.1%
+
+Customer ID: 115561
+----------------------------------------------------------------------
+  1. All-Mountain Skis (Skis)
+     Purchase Probability: 90.9%
+  2. Powder Skis (Skis)
+     Purchase Probability: 76.5%
+
+Total Customers: 2
+Total Recommendations: 3
+
+These recommendations are based on ML predictions trained on millions of 
+customer-product interactions. The high probabilities indicate strong 
+matches for targeted marketing campaigns.
+```
+
+**Key Benefits:**
+- **Natural Language Access**: Users don't need to know stored procedure syntax
+- **ML-Powered Insights**: Leverages trained models for intelligent recommendations
+- **Formatted Output**: Returns human-readable strings perfect for conversational interfaces
+- **Production-Ready**: Deterministic results suitable for business campaigns
+
+**See:** `ml-training/README.md` for complete model training and deployment guide
+
+---
+
 ## Use Cases
 
 ### Cortex Analyst & Agent
 - Business users asking questions in natural language
 - Ad-hoc analytics without writing SQL
 - Semantic understanding of business metrics
+- **ML-powered recommendations** through custom tools
 
 ### Cortex Search
 - Product discovery and recommendations
@@ -105,4 +190,5 @@ SELECT PARSE_JSON(
 - Semantic product search in applications
 
 ## Related Demos
+- **ML Training**: Train and deploy product recommendation model as custom agent tool
 - **Streamlit Dashboard**: Integrates with Cortex Agent for natural language queries

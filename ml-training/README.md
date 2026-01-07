@@ -218,13 +218,107 @@ GRANT CREATE MODEL ON SCHEMA AUTOMATED_INTELLIGENCE.MODELS TO ROLE <your_role>;
 - [Container Runtime Guide](https://docs.snowflake.com/en/developer-guide/snowflake-ml/container-runtime)
 - [Ray Documentation](https://docs.ray.io/)
 
+## 🚀 Deployment: Product Recommendation Stored Procedure
+
+After training the model, deploy it as a stored procedure for easy integration with applications and Cortex Agents.
+
+### Step 4: Deploy Stored Procedure
+
+```bash
+# Deploy the stored procedure
+snow sql -c dash-builder-si -f product_recommendations_sproc.sql
+```
+
+This creates:
+- **Procedure**: `AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(N_CUSTOMERS, N_PRODUCTS, SEGMENT)`
+- **Returns**: Formatted string with personalized product recommendations
+- **Inference**: Uses SPCS service `GPU_XGBOOST_SERVICE!PREDICT_PROBA`
+
+### Usage Examples
+
+```sql
+-- Get 3 recommendations for 2 low-engagement customers
+CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(2, 3, 'LOW_ENGAGEMENT');
+
+-- Get 5 recommendations for 10 high-value inactive customers
+CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(10, 5, 'HIGH_VALUE_INACTIVE');
+
+-- Get recommendations for new customers
+CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(5, 3, 'NEW_CUSTOMERS');
+```
+
+### Available Customer Segments
+
+| Segment | Description | Use Case |
+|---------|-------------|----------|
+| `LOW_ENGAGEMENT` | 3-5 orders | Upsell opportunities |
+| `HIGH_VALUE_INACTIVE` | High spenders inactive 180+ days | Re-engagement campaigns |
+| `NEW_CUSTOMERS` | 1-2 orders | Build loyalty |
+| `AT_RISK` | Inactive 180+ days | Churn prevention |
+| `HIGH_VALUE_ACTIVE` | Active high spenders ($1000+) | Retention programs |
+| `REGULAR` | All other customers | General promotions |
+
+### Output Format
+
+The stored procedure returns a nicely formatted string ideal for Cortex Agents:
+
+```
+Product Recommendations for Low Engagement (3-5 orders) Segment
+======================================================================
+
+Customer ID: 10045
+----------------------------------------------------------------------
+  1. Powder Skis (Skis)
+     Purchase Probability: 97.1%
+
+Customer ID: 115561
+----------------------------------------------------------------------
+  1. All-Mountain Skis (Skis)
+     Purchase Probability: 90.9%
+  2. Powder Skis (Skis)
+     Purchase Probability: 76.5%
+
+Total Customers: 2
+Total Recommendations: 3
+```
+
+### Integration with Cortex Agents
+
+Use this stored procedure as a tool in Cortex Agents:
+
+**Agent Instructions:**
+```
+You are a Product Recommendation Assistant. You have access to:
+GET_PRODUCT_RECOMMENDATIONS(n_customers, n_products, segment)
+
+When users ask for recommendations:
+1. Identify the target segment
+2. Call the stored procedure
+3. Present results with purchase probabilities
+4. Explain business value
+```
+
+**Sample Prompts:**
+- "Show me product recommendations for low engagement customers"
+- "Which products should I recommend to inactive high-value customers?"
+- "Get 10 customers from the at-risk segment with their top 5 products"
+
+### Technical Details
+
+**Approach**: Pure SQL feature engineering + Snowpark ML inference
+- Avoids Snowpark DataFrame column reference issues
+- Uses SQL CTEs for customer segmentation and feature calculation
+- Snowpark only for ML model inference via `F.call_function()`
+- Deterministic results (ordered by `DAYS_SINCE_LAST_ORDER DESC, CUSTOMER_ID ASC`)
+
 ## 🎓 Next Steps
 
 1. **Experiment with Features**: Add more customer behavior metrics
 2. **Hyperparameter Tuning**: Use Ray Tune for automated optimization
 3. **Production Deployment**: Schedule notebook runs for regular retraining
 4. **A/B Testing**: Compare multiple model versions using Model Registry
-5. **Real-time Scoring**: Deploy model for real-time predictions
+5. **Real-time Scoring**: Integrate stored procedure with applications
+6. **Cortex Agent Integration**: Use stored procedure as a tool for conversational recommendations
 
 ## 💡 Tips
 
@@ -232,6 +326,8 @@ GRANT CREATE MODEL ON SCHEMA AUTOMATED_INTELLIGENCE.MODELS TO ROLE <your_role>;
 - **Monitor Costs**: Ray clusters consume warehouse credits - scale down when not training
 - **Version Control**: Each training run creates a new model version - use meaningful version names
 - **Feature Store**: Consider creating a feature store for reusable features across models
+- **Stored Procedure**: Returns formatted strings for easy integration with Cortex Agents
+- **Deterministic Results**: Stored procedure ensures consistent recommendations for the same parameters
 
 ---
 

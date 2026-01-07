@@ -420,6 +420,30 @@ cd ml-training
 
 **See:** `ml-training/README.md` for detailed setup, configuration, and troubleshooting
 
+### Deploying as Stored Procedure
+
+After training, deploy the model as a stored procedure for application integration:
+
+```bash
+cd ml-training
+snow sql -c <your-connection-name> -f product_recommendations_sproc.sql
+```
+
+**Usage:**
+```sql
+-- Get recommendations for low-engagement customers
+CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(2, 3, 'LOW_ENGAGEMENT');
+
+-- Returns formatted string with customer-product recommendations and probabilities
+```
+
+**Integration with Cortex Agents:**
+- Returns nicely formatted strings (not tables) for conversational AI
+- Deterministic results for consistent recommendations
+- Available segments: LOW_ENGAGEMENT, HIGH_VALUE_INACTIVE, NEW_CUSTOMERS, AT_RISK, HIGH_VALUE_ACTIVE
+
+**See:** `ml-training/README.md` (Step 4) for complete deployment guide and Cortex Agent integration
+
 ---
 
 ### DEMO 5: DBT Analytics - Batch Analytical Models
@@ -707,6 +731,39 @@ CREATE OR REPLACE CORTEX AGENT AUTOMATED_INTELLIGENCE.SEMANTIC.ORDER_ANALYTICS_A
 - Semantic model uses **logical table names** in verified queries (e.g., `orders`, `daily_business_metrics`)
 - Agent created in `SEMANTIC` schema with `AUTOMATED_INTELLIGENCE` role
 - Requires `CREATE SNOWFLAKE INTELLIGENCE ON ACCOUNT` privilege
+
+### Advanced: Custom ML Tools for Agents
+
+**Extend Cortex Agents with trained ML models as custom tools:**
+
+After training the product recommendation model (see DEMO 6), integrate it as a conversational tool:
+
+```bash
+# Deploy model as stored procedure
+cd ml-training
+snow sql -c <your-connection-name> -f product_recommendations_sproc.sql
+```
+
+**Sample conversational queries:**
+```
+User: "Show me product recommendations for low engagement customers"
+User: "Which products should I recommend to inactive high-value customers?"
+User: "Get 10 at-risk customers with their top 5 product recommendations"
+```
+
+**Agent response includes:**
+- Customer IDs with their segment
+- Top N product recommendations per customer
+- Purchase probability for each recommendation
+- Total summary (customers and recommendations count)
+
+**Key benefits:**
+- **Natural language access** to ML predictions
+- **No SQL knowledge** required
+- **Formatted output** perfect for business users
+- **Production-ready** with deterministic results
+
+**See:** `snowflake-intelligence/README.md` for agent tool definition and complete integration guide
 
 **See:** `snowflake-intelligence/README.md` for detailed setup, semantic model customization, and troubleshooting
 
