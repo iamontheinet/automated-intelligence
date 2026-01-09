@@ -13,7 +13,7 @@ snow sql -f setup.sql -c dash-builder-si
 
 - `business_insights_semantic_model.yaml` - Semantic model definition for Cortex Analyst (uses logical table names for verified queries)
 - `create_agent.sql` - Creates Cortex Agent in `AUTOMATED_INTELLIGENCE.SEMANTIC` schema for natural language queries
-- `create_cortex_search.sql` - Creates Cortex Search service for product discovery
+- `create_postgres_search_services.sql` - Creates Cortex Search services for Postgres-synced data (product reviews & support tickets)
 
 ## Setup Instructions
 
@@ -47,10 +47,13 @@ snow sql -f snowflake-intelligence/create_cortex_search.sql -c dash-builder-si
 - Uses semantic model for context-aware SQL generation
 - Requires `CREATE SNOWFLAKE INTELLIGENCE ON ACCOUNT` privilege
 
-### Cortex Search Service
-- **Service**: `automated_intelligence.raw.product_search_service`
-- Enables semantic search over product catalog
-- Useful for product discovery and recommendations
+### Cortex Search Services
+- **Service**: `automated_intelligence.semantic.product_reviews_search`
+  - Enables semantic search over product reviews synced from Postgres
+  - Search by review text with attributes: product_id, customer_id, rating, review_title, review_date
+- **Service**: `automated_intelligence.semantic.support_tickets_search`
+  - Enables semantic search over support tickets synced from Postgres
+  - Search by description with attributes: customer_id, category, priority, subject, status, ticket_date
 
 ## Verification
 
@@ -78,14 +81,28 @@ SELECT SNOWFLAKE.CORTEX.COMPLETE(
 );
 ```
 
-### Test Cortex Search
+### Test Cortex Search (Product Reviews)
 ```sql
 SELECT PARSE_JSON(
   SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-    'automated_intelligence.raw.product_search_service',
+    'automated_intelligence.semantic.product_reviews_search',
     '{
-      "query": "backcountry skiing equipment",
-      "columns": ["product_name", "description", "price"],
+      "query": "quality issues with boots",
+      "columns": ["review_title", "review_text", "rating"],
+      "limit": 5
+    }'
+  )
+)['results'] AS search_results;
+```
+
+### Test Cortex Search (Support Tickets)
+```sql
+SELECT PARSE_JSON(
+  SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+    'automated_intelligence.semantic.support_tickets_search',
+    '{
+      "query": "shipping delays and refund",
+      "columns": ["subject", "description", "category", "priority"],
       "limit": 5
     }'
   )
@@ -185,9 +202,9 @@ matches for targeted marketing campaigns.
 - **ML-powered recommendations** through custom tools
 
 ### Cortex Search
-- Product discovery and recommendations
-- Similar product suggestions
-- Semantic product search in applications
+- Product reviews search - find customer feedback by sentiment and content
+- Support tickets search - discover issues and complaints
+- Natural language queries in Snowflake Intelligence via Cortex Agent
 
 ## Related Demos
 - **ML Training**: Train and deploy product recommendation model as custom agent tool

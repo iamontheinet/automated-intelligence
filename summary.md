@@ -54,11 +54,19 @@ The lifecycle culminates in **Snowflake Intelligence**, providing a natural lang
 * **Cortex AI:** Users can perform conversational analytics using Cortex Agents and semantic models. This allows for natural language queries involving multi-table joins and business terminology mapping.
 * **Row-Level Access Control (RLAC):** Governance is enforced via row access policies that are transparent to the AI agent. For example, a "West Coast Manager" role will only receive answers based on data from specific states (e.g., CA, OR, WA), while an Admin sees global data.
 
+## 7. Hybrid OLTP/OLAP Architecture (Snowflake Postgres)
+
+The platform integrates **Snowflake Postgres** for transactional workloads with Snowflake for analytics.
+
+* **OLTP Layer (Postgres):** Handles transactional writes for product reviews and support tickets - the kind of high-frequency writes typical in customer-facing applications.
+* **OLAP Layer (Snowflake):** Provides analytics, Cortex AI, and semantic search over synced data.
+* **MERGE-based Sync:** A scheduled task runs every 5 minutes, using MERGE operations to efficiently sync data from Postgres to Snowflake (handling inserts, updates, and deletes).
+* **Cortex Search:** Two search services enable semantic search over product reviews and support tickets, allowing natural language queries like "What are customers saying about Ski Boots?"
+
 ## 6. Monitoring
 
 A **Streamlit Dashboard** provides real-time observability across the entire pipeline. It monitors live ingestion metrics, Dynamic Table health, Interactive Table query latency, and ML model feature importance.
 
----
+## Summary of Capabilities
 
-**Summary of Capabilities**
-This suite demonstrates a fully native stack that requires no external systems. It offers set-and-forget automation for transformations, linear scalability for ingestion, and enterprise-grade security built directly into the data platform.
+This suite demonstrates a fully native stack that requires no external systems. It offers set-and-forget automation for transformations, linear scalability for ingestion, and enterprise-grade security built directly into the data platform. The Hybrid OLTP/OLAP architecture with Snowflake Postgres showcases how transactional and analytical workloads can coexist, with Cortex Search and Agent enabling natural language access to all data.

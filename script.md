@@ -13,6 +13,7 @@ This demo suite executes a full-stack data lifecycle, starting with real-time in
 7. **Streamlit Dashboard**: Real-time monitoring of ingestion and performance
 8. **Snowflake Intelligence**: AI-powered conversational analytics using Cortex Agent
 9. **Security & Governance**: Row-based access control for Cortex Agents
+10. **Snowflake Postgres**: Hybrid OLTP/OLAP architecture with Cortex Search
 
 ### Demo Flow
 ```
@@ -69,6 +70,14 @@ This demo suite executes a full-stack data lifecycle, starting with real-time in
 │  DEMO 9: GOVERNANCE & SECURITY LAYER                             │
 │  Row Access Policies → Transparent data filtering               │
 │  • Agent-compatible row-level security                          │
+└──────────────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  DEMO 10: HYBRID OLTP/OLAP LAYER (Snowflake Postgres)            │
+│  Postgres (OLTP) → Snowflake (OLAP) → Cortex Search/Agent       │
+│  • Product reviews & support tickets in Postgres                │
+│  • MERGE-based sync via scheduled task                          │
+│  • Cortex Search for semantic search                            │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -172,6 +181,7 @@ Choose demos based on your audience:
 | **7. Streamlit Dashboard** | Continuous | Everyone | Real-time pipeline monitoring |
 | **8. Snowflake Intelligence** | 10-15 min | Business Users, Analysts | Natural language queries via Cortex Agent |
 | **9. Security & Governance** | 10-15 min | Security Teams, Compliance | Transparent row-level security with AI |
+| **10. Snowflake Postgres** | 10-15 min | Data Engineers, Architects | Hybrid OLTP/OLAP with Cortex Search |
 | **Full Suite** | 90-120 min | Executive Demos, All-Hands | Complete end-to-end capabilities |
 
 ---
@@ -274,7 +284,7 @@ SELECT 'order_items', COUNT(*) FROM RAW.ORDER_ITEMS;
 > "Snowpipe Streaming provides exactly-once delivery guarantees, automatic offset management, and linear horizontal scaling. No external streaming infrastructure needed - it's native to Snowflake. Choose Python for rapid development and integration with data science tools, or Java for enterprise JVM environments. Both deliver identical performance and functionality."
 
 **See:** 
-- Python: `snowpipe-streaming-python/README.md` and `COMPARISON.md`
+- Python: `snowpipe-streaming-python/README.md`
 - Java: `snowpipe-streaming-java/README.md`
 
 ---
@@ -1396,6 +1406,140 @@ USE ROLE west_coast_manager;
 
 ---
 
+# DEMO 10: Snowflake Postgres - Hybrid OLTP/OLAP Architecture
+
+## Overview
+Demonstrates a Hybrid OLTP/OLAP architecture where Postgres handles transactional writes (product reviews, support tickets) and Snowflake handles analytics with Cortex Search and natural language queries.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OLTP Layer (Snowflake Postgres)                   │
+│  ┌─────────────────────┐ ┌─────────────────────────────────────┐    │
+│  │   product_reviews   │ │         support_tickets             │    │
+│  │   (transactional    │ │         (transactional              │    │
+│  │    writes)          │ │          writes)                    │    │
+│  └─────────────────────┘ └─────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+                           │
+                           │ MERGE-based Sync (5 min scheduled task)
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    OLAP Layer (Snowflake)                            │
+│  ┌─────────────────────┐ ┌─────────────────────────────────────┐    │
+│  │ RAW.PRODUCT_REVIEWS │ │    RAW.SUPPORT_TICKETS              │    │
+│  └─────────────────────┘ └─────────────────────────────────────┘    │
+│                           │                                          │
+│                           ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              Cortex Search Services (SEMANTIC)               │    │
+│  │  • product_reviews_search - semantic search over reviews    │    │
+│  │  • support_tickets_search - semantic search over tickets    │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                           │                                          │
+│                           ▼                                          │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              Cortex Agent (Snowflake Intelligence)           │    │
+│  │  Natural language queries: "What are customers saying about  │    │
+│  │  Ski Boots?" or "Show me complaints about shipping"         │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Demo Flow
+
+### Step 1: Show the Hybrid Architecture
+```sql
+-- Postgres has the transactional source
+SELECT COUNT(*) AS postgres_reviews 
+FROM TABLE(POSTGRES.pg_query('SELECT * FROM product_reviews'));
+
+SELECT COUNT(*) AS postgres_tickets 
+FROM TABLE(POSTGRES.pg_query('SELECT * FROM support_tickets'));
+
+-- Snowflake has the synced analytics copy
+SELECT COUNT(*) AS snowflake_reviews FROM RAW.PRODUCT_REVIEWS;
+SELECT COUNT(*) AS snowflake_tickets FROM RAW.SUPPORT_TICKETS;
+```
+
+**What to say:**
+> "This is a Hybrid OLTP/OLAP architecture. Postgres handles the transactional writes - when customers submit reviews or support tickets, those go directly to Postgres. Snowflake handles the analytics - the data is synced via a scheduled MERGE task every 5 minutes."
+
+### Step 2: Show the MERGE-based Sync
+```sql
+-- Check sync task status
+SHOW TASKS LIKE 'postgres_sync_task' IN SCHEMA POSTGRES;
+
+-- Manually trigger sync (or wait for scheduled run)
+CALL POSTGRES.sync_postgres_to_snowflake();
+```
+
+**What to say:**
+> "The sync uses MERGE operations - not DELETE+INSERT. This is more realistic for production because it handles inserts, updates, and deletes efficiently. The task runs every 5 minutes, but you can adjust this based on your latency requirements."
+
+### Step 3: Demonstrate Cortex Search
+```sql
+-- Search product reviews for quality issues
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.PRODUCT_REVIEWS_SEARCH',
+        '{"query": "quality issues with boots", 
+          "columns": ["review_title", "review_text", "rating"], 
+          "limit": 5}'
+    )
+)['results'] AS results;
+
+-- Search support tickets for shipping complaints
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.SUPPORT_TICKETS_SEARCH',
+        '{"query": "shipping delays and refund", 
+          "columns": ["subject", "description", "priority"], 
+          "limit": 5}'
+    )
+)['results'] AS results;
+```
+
+**What to say:**
+> "Once data is in Snowflake, Cortex Search enables semantic search. I can search for 'quality issues' and it finds reviews mentioning 'disappointed', 'wear and tear', 'cheap materials' - even though those exact words weren't in my query. This is vector-based semantic search, not keyword matching."
+
+### Step 4: Natural Language Queries via Agent (Snowflake Intelligence UI)
+
+Navigate to **AI & ML > Snowflake Intelligence** and ask:
+
+```
+"What are customers saying about Ski Boots?"
+"Summarize recent complaints about shipping"
+"Which products have the most negative feedback?"
+"Find support tickets about returns"
+```
+
+**What to say:**
+> "The Cortex Agent can use these search services as tools. When I ask 'What are customers saying about Ski Boots?', the agent automatically searches through product reviews and summarizes the sentiment. This is conversational AI over your transactional data."
+
+## Key Talking Points
+
+**Why Hybrid OLTP/OLAP?**
+> "Postgres excels at high-frequency transactional writes - the kind of workload you get from customer-facing applications. Snowflake excels at analytics, AI, and complex queries. By combining them, you get the best of both worlds without compromising on either."
+
+**Why MERGE-based Sync?**
+> "MERGE is more production-realistic than DELETE+INSERT. It efficiently handles all three cases: new records (INSERT), updated records (UPDATE), and deleted records (DELETE). The sync task runs on a schedule - you can adjust the frequency based on your latency requirements."
+
+**Why Cortex Search?**
+> "Cortex Search enables semantic search without building your own vector database or embedding pipeline. It automatically indexes the data and provides similarity search. Combined with Cortex Agent, users can query this data in natural language."
+
+## Data Characteristics
+
+| Table | Records | Sentiment Distribution |
+|-------|---------|------------------------|
+| product_reviews | ~395 | 65% positive, 15% negative, 20% neutral |
+| support_tickets | ~500 | 40% positive, 20% negative, 40% neutral |
+
+**See:** `snowflake-postgres/README.md` for detailed setup and architecture
+
+---
+
 
 
 ## 🔄 Running Demos Sequentially
@@ -1520,7 +1664,7 @@ Or keep the structure and just add more data:
 - **This File**: `script.md` - Complete demo guide with talking points
 - **Gen2 Warehouses**: `gen2-warehouse/README.md` - Performance testing and benchmarking
 - **Interactive Tables**: `interactive/README.md` - Performance deep dive
-- **Snowpipe Python**: `snowpipe-streaming-python/README.md` and `COMPARISON.md`
+- **Snowpipe Python**: `snowpipe-streaming-python/README.md`
 - **Snowpipe Java**: `snowpipe-streaming-java/README.md`
 - **DBT Analytics**: `dbt-analytics/README.md` and `dbt-analytics/DEPLOYMENT.md`
 - **ML Training**: `ml-training/README.md` - GPU workspace setup

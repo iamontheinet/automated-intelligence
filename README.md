@@ -13,6 +13,7 @@ This demo suite executes a full-stack data lifecycle, starting with real-time in
 7. **Streamlit Dashboard** - Real-time monitoring of ingestion and performance
 8. **Snowflake Intelligence** - AI-powered conversational analytics using Cortex Agent for intuitive data exploration
 9. **Security & Governance** - Row-based access control for Cortex Agents
+10. **Snowflake Postgres** - Hybrid OLTP/OLAP architecture with Postgres for transactional writes and Snowflake for analytics
 
 All demos share the same foundation and work together to show an end-to-end data lifecycle on Snowflake.
 
@@ -104,6 +105,15 @@ All demos share the same foundation and work together to show an end-to-end data
 │  • Agent-compatible (same agent, different data views)          │
 │  • Zero application code changes required                       │
 │  • Policy-based governance (not query rewriting)                │
+└──────────────────────────────────────────────────────────────────┘
+                           ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  DEMO 10: HYBRID OLTP/OLAP LAYER (Snowflake Postgres)            │
+│  Postgres (OLTP) → Snowflake (OLAP) → Cortex Search/Agent       │
+│  • Product reviews & support tickets written to Postgres        │
+│  • MERGE-based sync to Snowflake (5-minute scheduled task)      │
+│  • Cortex Search for semantic search over synced data           │
+│  • Natural language queries via Cortex Agent                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -319,6 +329,7 @@ Choose demos based on your audience and time:
 | **7. Streamlit Dashboard** | Continuous | Everyone | Real-time pipeline monitoring |
 | **8. Snowflake Intelligence** | 10-15 min | Business Users, Analysts | Natural language queries |
 | **9. Security & Governance** | 10-15 min | Security Teams, Compliance | Transparent row-level security |
+| **10. Snowflake Postgres** | 10-15 min | Data Engineers, Architects | Hybrid OLTP/OLAP with Cortex Search |
 | **Full Suite** | 90-120 min | Executive Demos, All-Hands | Complete end-to-end workflow |
 
 ---
@@ -594,7 +605,7 @@ java ParallelStreamingOrchestrator <total-orders> <num-instances>
 - Massive-scale: Achievable with sufficient parallel instances
 
 **See:** 
-- Python: `snowpipe-streaming-python/README.md` and `COMPARISON.md`
+- Python: `snowpipe-streaming-python/README.md`
 - Java: `snowpipe-streaming-java/README.md`
 
 ---
@@ -631,6 +642,78 @@ SELECT state, SUM(revenue) FROM orders GROUP BY state;
 **Key insight:** West Coast Manager doesn't even know other states exist - filtered at database level!
 
 **See:** `security-and-governance/README.md` for setup and agent demos
+
+---
+
+### DEMO 10: Snowflake Postgres - Hybrid OLTP/OLAP Architecture
+
+**What it demonstrates:**
+- Hybrid architecture: Postgres for OLTP (transactional writes), Snowflake for OLAP (analytics)
+- MERGE-based sync from Postgres to Snowflake via scheduled task
+- Cortex Search services for semantic search over synced data
+- Natural language queries via Cortex Agent
+
+**Architecture:**
+```
+Postgres (OLTP)                    Snowflake (OLAP)
+┌─────────────────┐               ┌─────────────────────────────┐
+│ product_reviews │ ──MERGE sync──│ RAW.PRODUCT_REVIEWS         │
+│ support_tickets │    (5 min)    │ RAW.SUPPORT_TICKETS         │
+└─────────────────┘               └─────────────────────────────┘
+                                              │
+                                              ▼
+                                  ┌─────────────────────────────┐
+                                  │ Cortex Search Services      │
+                                  │ • product_reviews_search    │
+                                  │ • support_tickets_search    │
+                                  └─────────────────────────────┘
+                                              │
+                                              ▼
+                                  ┌─────────────────────────────┐
+                                  │ Cortex Agent                │
+                                  │ Natural language queries    │
+                                  └─────────────────────────────┘
+```
+
+**Quick start:**
+```bash
+cd snowflake-postgres
+
+# Setup external access and sync
+snow sql -c dash-builder-si -f 02_setup_external_access.sql
+snow sql -c dash-builder-si -f 03_create_query_functions.sql
+snow sql -c dash-builder-si -f 05_create_sync_task.sql
+
+# Create Cortex Search services
+snow sql -c dash-builder-si -f ../snowflake-intelligence/create_postgres_search_services.sql
+```
+
+**Test search services:**
+```sql
+-- Search product reviews
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.PRODUCT_REVIEWS_SEARCH',
+        '{"query": "quality issues with boots", "columns": ["review_title", "review_text", "rating"], "limit": 5}'
+    )
+)['results'] AS results;
+
+-- Search support tickets
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.SUPPORT_TICKETS_SEARCH',
+        '{"query": "shipping delays", "columns": ["subject", "description", "priority"], "limit": 5}'
+    )
+)['results'] AS results;
+```
+
+**Key insights:**
+- Postgres excels at OLTP (high-frequency transactional writes)
+- Snowflake excels at OLAP (analytics, AI, complex queries)
+- MERGE-based sync is production-realistic (vs DELETE+INSERT)
+- Cortex Search enables semantic search without manual indexing
+
+**See:** `snowflake-postgres/README.md` for detailed setup and architecture
 
 ---
 
@@ -1154,7 +1237,7 @@ automated-intelligence/
 │   │   ├── models.py
 │   │   └── data_generator.py
 │   ├── config_staging.properties      # Staging target config
-│   ├── profile_staging.json           # Staging schema profile
+│   ├── profile_staging.json.template  # Staging credentials template
 │   ├── requirements.txt
 │   └── README.md               # SDK setup and configuration instructions
 │
@@ -1222,7 +1305,7 @@ Or keep the structure and just add more data:
 - **dbt-analytics/README.md** - DBT setup and model details
 - **dbt-analytics/DEPLOYMENT.md** - Production DBT deployment guide
 - **snowpipe-streaming-python/README.md** - Python implementation guide
-- **snowpipe-streaming-python/COMPARISON.md** - Python vs Java comparison
+
 - **snowpipe-streaming-java/README.md** - Java implementation guide
 - **security-and-governance/README.md** - RBAC setup and examples
 - **streamlit-dashboard/README.md** - Dashboard deployment and usage

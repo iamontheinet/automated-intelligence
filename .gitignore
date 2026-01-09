@@ -29,8 +29,14 @@ agent-evaluation/config.properties
 profile.json
 **/profile.json
 snowpipe-streaming-java/profile.json
-snowpipe-streaming-java/profile.json.template
 snowpipe-streaming-python/profile.json
+profile_staging.json
+**/profile_staging.json
+snowpipe-streaming-java/profile_staging.json
+snowpipe-streaming-python/profile_staging.json
+postgres_config.json
+**/postgres_config.json
+snowflake-postgres/postgres_config.json
 
 # Environment variables and secrets
 .env
