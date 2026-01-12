@@ -55,9 +55,47 @@ Query Snowflake Iceberg data directly from Postgres using pg_lake - demonstratin
 
 - Docker & Docker Compose
 - AWS credentials configured (`~/.aws/credentials`) with access to `s3://dash-iceberg-snowflake/`
-- pg_lake Docker images built locally:
+- pg_lake Docker images built locally (see [Building pg_lake Images](#building-pg_lake-images) below):
   - `pg_lake:local`
   - `pgduck-server:local`
+- psql client (optional, for local connections)
+
+## Building pg_lake Images
+
+The Docker images must be built from the [pg_lake repository](https://github.com/Snowflake-Labs/pg_lake):
+
+```bash
+# Clone the pg_lake repository
+git clone --recurse-submodules https://github.com/Snowflake-Labs/pg_lake.git
+cd pg_lake
+
+# Install go-task (build tool)
+brew install go-task
+
+# Build Docker images (requires 8-16GB Docker memory allocation)
+cd docker
+task compose:up
+
+# Verify images were created
+docker images | grep -E 'pg_lake|pgduck-server'
+# Should show: pg_lake:local and pgduck-server:local
+
+# Stop pg_lake's containers (we'll use our own docker-compose)
+docker compose down
+
+# Return to this project
+cd /path/to/automated-intelligence/pg_lake
+```
+
+> **Note**: Building requires significant memory. If you get "cannot allocate memory" errors, increase Docker Desktop memory to 12-16GB via Settings → Resources → Memory.
+
+## Install psql Client (Optional)
+
+```bash
+brew install libpq
+echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
 
 ## Quick Start
 
@@ -184,8 +222,18 @@ docker compose down -v
 ### Connection refused
 Wait 30 seconds after `docker compose up` for initialization.
 
+### pgduck-server unhealthy / "No such file or directory"
+This usually means a PostgreSQL version mismatch. The pg_lake images are built with PostgreSQL 18, so ensure `docker-compose.yml` has:
+```yaml
+environment:
+  PG_MAJOR: "18"  # Must match the built image version
+```
+
 ### S3 access denied
 Ensure `~/.aws/credentials` has valid credentials. The containers mount this file read-only.
+
+### Build fails with "cannot allocate memory"
+Increase Docker Desktop memory allocation to 12-16GB via Settings → Resources → Memory, then retry the build.
 
 ### Wrong data / stale data
 Iceberg metadata paths change when tables are refreshed. Get the latest path from Snowflake and recreate the foreign table.
