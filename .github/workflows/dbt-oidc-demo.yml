@@ -1,0 +1,93 @@
+name: ❄️ dbt CI (OIDC Demo)
+
+on:
+  workflow_dispatch:
+
+env:
+  SNOWFLAKE_ACCOUNT: sfsenorthamerica-gen_ai_hol
+  SNOWFLAKE_USER: github_actions_dbt
+  SNOWFLAKE_DATABASE: AUTOMATED_INTELLIGENCE
+  SNOWFLAKE_WAREHOUSE: AUTOMATED_INTELLIGENCE_WH
+  SNOWFLAKE_ROLE: SNOWFLAKE_INTELLIGENCE_ADMIN
+
+jobs:
+  dbt-oidc:
+    name: 🔐 OIDC Auth → dbt Test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: pip install dbt-snowflake snowflake-connector-python
+
+      - name: 🔐 Get OIDC Token (NO SECRETS!)
+        id: auth
+        run: |
+          echo "🔑 Requesting OIDC token from GitHub..."
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=snowflakecomputing.com" | jq -r '.value')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✅ Got OIDC token (short-lived, no secrets stored!)"
+
+      - name: ❄️ dbt test (validates real data)
+        working-directory: dbt-analytics
+        env:
+          SNOWFLAKE_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          echo "📊 Running dbt tests via OIDC authentication..."
+          dbt deps --profiles-dir .
+          dbt test --select customer_lifetime_value --profiles-dir . --target oidc
+
+      - name: 🎯 Query Results (proves real access)
+        env:
+          SNOWFLAKE_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          python << 'EOF'
+          import snowflake.connector
+          import os
+
+          print("🔐 Connecting via OIDC (zero secrets!)...")
+          conn = snowflake.connector.connect(
+              account=os.environ['SNOWFLAKE_ACCOUNT'],
+              user=os.environ['SNOWFLAKE_USER'],
+              authenticator='WORKLOAD_IDENTITY',
+              workload_identity_provider='OIDC',
+              token=os.environ['SNOWFLAKE_TOKEN'],
+              warehouse=os.environ['SNOWFLAKE_WAREHOUSE'],
+              database=os.environ['SNOWFLAKE_DATABASE'],
+              role=os.environ['SNOWFLAKE_ROLE']
+          )
+
+          cur = conn.cursor()
+          cur.execute("""
+              SELECT 
+                  COUNT(*) as customers,
+                  ROUND(SUM(total_revenue), 2) as revenue,
+                  ROUND(AVG(total_revenue), 2) as avg_revenue
+              FROM DBT_ANALYTICS.CUSTOMER_LIFETIME_VALUE
+          """)
+          row = cur.fetchone()
+          
+          print("")
+          print("=" * 50)
+          print("🎯 LIVE DATA FROM SNOWFLAKE")
+          print("=" * 50)
+          print(f"   Customers:    {row[0]:,}")
+          print(f"   Total Revenue: ${row[1]:,.2f}")
+          print(f"   Avg Revenue:   ${row[2]:,.2f}")
+          print("=" * 50)
+          print("")
+          print("✅ Authenticated via GitHub OIDC")
+          print("✅ Zero secrets stored in this repository!")
+          EOF

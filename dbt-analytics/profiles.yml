@@ -24,3 +24,16 @@ automated_intelligence:
       schema: staging  # Base schema (will be overridden by custom_schema in models)
       threads: 4
       client_session_keep_alive: False
+
+    # GitHub Actions OIDC target (no secrets!)
+    oidc:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: staging
+      threads: 4
+      authenticator: WORKLOAD_IDENTITY
+      token: "{{ env_var('SNOWFLAKE_TOKEN') }}"
