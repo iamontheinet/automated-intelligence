@@ -1,4 +1,4 @@
-name: ❄️ dbt CI (OIDC Demo)
+name: ❄️ dbt CI/CD via OIDC IN Snowflake
 
 on:
   workflow_dispatch:
