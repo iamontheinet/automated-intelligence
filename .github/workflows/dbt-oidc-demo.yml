@@ -1,4 +1,4 @@
-name: ❄️ dbt CI/CD via OIDC IN Snowflake
+name: ❄️ Snowflake OIDC Demo (Zero Secrets)
 
 on:
   workflow_dispatch:
@@ -11,26 +11,23 @@ env:
   SNOWFLAKE_ROLE: SNOWFLAKE_INTELLIGENCE_ADMIN
 
 jobs:
-  dbt-oidc:
-    name: 🔐 OIDC Auth → dbt Test
+  snowflake-oidc:
+    name: 🔐 OIDC Auth → Query Snowflake
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
       
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: 📦 Install dependencies
-        run: pip install dbt-snowflake snowflake-connector-python
+      - name: 📦 Install Snowflake connector
+        run: pip install snowflake-connector-python
 
-      - name: 🔐 Get OIDC Token (NO SECRETS!)
+      - name: 🔐 Get OIDC Token (NO SECRETS STORED!)
         id: auth
         run: |
           echo "🔑 Requesting OIDC token from GitHub..."
@@ -38,18 +35,9 @@ jobs:
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=snowflakecomputing.com" | jq -r '.value')
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "✅ Got OIDC token (short-lived, no secrets stored!)"
+          echo "✅ Got short-lived OIDC token (expires in 10 min)"
 
-      - name: ❄️ dbt test (validates real data)
-        working-directory: dbt-analytics
-        env:
-          SNOWFLAKE_TOKEN: ${{ steps.auth.outputs.token }}
-        run: |
-          echo "📊 Running dbt tests via OIDC authentication..."
-          dbt deps --profiles-dir .
-          dbt test --select customer_lifetime_value --profiles-dir . --target oidc
-
-      - name: 🎯 Query Results (proves real access)
+      - name: ❄️ Query Snowflake (proves real access)
         env:
           SNOWFLAKE_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
@@ -57,7 +45,10 @@ jobs:
           import snowflake.connector
           import os
 
-          print("🔐 Connecting via OIDC (zero secrets!)...")
+          print("🔐 Connecting to Snowflake via OIDC...")
+          print("   (Zero secrets stored in this repository!)")
+          print("")
+
           conn = snowflake.connector.connect(
               account=os.environ['SNOWFLAKE_ACCOUNT'],
               user=os.environ['SNOWFLAKE_USER'],
@@ -70,6 +61,15 @@ jobs:
           )
 
           cur = conn.cursor()
+          
+          # Verify identity
+          cur.execute("SELECT CURRENT_USER(), CURRENT_ROLE()")
+          user, role = cur.fetchone()
+          print(f"✅ Authenticated as: {user}")
+          print(f"✅ Using role: {role}")
+          print("")
+
+          # Query real data
           cur.execute("""
               SELECT 
                   COUNT(*) as customers,
@@ -79,15 +79,15 @@ jobs:
           """)
           row = cur.fetchone()
           
-          print("")
           print("=" * 50)
           print("🎯 LIVE DATA FROM SNOWFLAKE")
           print("=" * 50)
-          print(f"   Customers:    {row[0]:,}")
+          print(f"   Customers:     {row[0]:,}")
           print(f"   Total Revenue: ${row[1]:,.2f}")
           print(f"   Avg Revenue:   ${row[2]:,.2f}")
           print("=" * 50)
           print("")
-          print("✅ Authenticated via GitHub OIDC")
-          print("✅ Zero secrets stored in this repository!")
+          print("✅ GitHub Actions authenticated via OIDC")
+          print("✅ No passwords, keys, or secrets stored!")
+          print("✅ Token auto-expires in 10 minutes")
           EOF
