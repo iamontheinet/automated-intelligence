@@ -347,6 +347,57 @@ Choose demos based on your audience and time:
 
 ## 📚 Demo Details
 
+
+
+### DEMO 1: Snowpipe Streaming - High-Scale Ingestion
+
+**What it demonstrates:**
+- High-performance real-time ingestion
+- Linear horizontal scaling (1 to 50+ parallel instances)
+- Python AND Java implementations (identical functionality)
+
+**Implementation Options:**
+
+#### Option 1: Python (Recommended for Quick Start)
+```bash
+cd snowpipe-streaming-python
+
+# Single instance
+python src/automated_intelligence_streaming.py <num-orders>
+
+# Parallel instances
+python src/parallel_streaming_orchestrator.py <total-orders> <num-instances>
+
+# Large scale
+python src/parallel_streaming_orchestrator.py <total-orders> <num-instances>
+```
+
+#### Option 2: Java
+```bash
+cd snowpipe-streaming-java
+
+# Build
+mvn clean install
+
+# Single instance
+java -jar target/automated-intelligence-streaming-1.0.0.jar <num-orders>
+
+# Parallel instances
+java ParallelStreamingOrchestrator <total-orders> <num-instances>
+```
+
+**Performance characteristics:**
+- Single instance: Fast ingestion with low latency
+- Parallel instances: Linear scaling for high throughput
+- Large-scale: Horizontal scaling to handle massive volumes
+- Massive-scale: Achievable with sufficient parallel instances
+
+**See:** 
+- Python: `snowpipe-streaming-python/README.md`
+- Java: `snowpipe-streaming-java/README.md`
+
+---
+
 ### DEMO 2: Gen2 Warehouse Performance - Next-Generation MERGE/UPDATE Operations
 
 **What it demonstrates:**
@@ -398,6 +449,110 @@ Gen2 warehouses typically show performance improvements on MERGE/UPDATE operatio
 - Only processes recent data (last 30 days) for efficiency
 
 **See:** `gen2-warehouse/README.md` for detailed setup, verification, troubleshooting, and automation with TASK
+
+---
+
+### DEMO 3: Dynamic Tables Pipeline
+
+**What it demonstrates:**
+- Incremental refresh (only process changes, not full datasets)
+- Automatic dependency management (DOWNSTREAM cascading)
+- Zero-maintenance orchestration (set once, runs forever)
+
+**Quick start:**
+```sql
+-- Generate new orders via Snowpipe Streaming
+-- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
+
+-- Manually refresh each tier (production: automatic!)
+ALTER DYNAMIC TABLE enriched_orders REFRESH;
+ALTER DYNAMIC TABLE fact_orders REFRESH;
+ALTER DYNAMIC TABLE daily_business_metrics REFRESH;
+
+-- Verify incremental refresh
+SELECT name, refresh_action, duration_seconds
+FROM TABLE(INFORMATION_SCHEMA.DYNAMIC_TABLE_REFRESH_HISTORY(...));
+```
+
+**Key insight:** All refreshes show `INCREMENTAL` - only new data processed, not entire dataset!
+
+**See:** `DEMO_SCRIPT.md` (Demo 2) for complete step-by-step guide
+
+---
+
+### DEMO 4: Interactive Tables & Warehouses
+
+**What it demonstrates:**
+- Low query latency under high concurrency
+- Performance improvement over standard warehouses
+- Complete native stack (no Redis, no external API database)
+
+**Quick start:**
+```bash
+cd interactive
+./demo.sh --threads <concurrent-threads> --warehouse both
+```
+
+**Sample queries displayed:**
+- CUSTOMER_LOOKUP: Point lookup by customer_id
+- ORDER_LOOKUP: Point lookup by order_id  
+- CUSTOMER_SUMMARY: Aggregation by customer_id
+
+**Expected results:**
+
+Interactive warehouses provide improved query performance under high concurrency compared to standard warehouses. Results vary based on workload patterns, query complexity, and data volume.
+
+**See:** `interactive/README.md` for complete documentation
+
+---
+
+### DEMO 5: DBT Analytics - Batch Analytical Models
+
+**What it demonstrates:**
+- Batch-processed analytical models in Snowflake Workspaces complementing real-time Dynamic Tables
+- Customer lifetime value and segmentation
+- Product affinity and recommendations
+- Monthly cohort retention analysis
+
+**Quick start:**
+```bash
+cd dbt-analytics
+
+# Local development
+pip install dbt-snowflake
+dbt deps
+dbt debug  # Test connection
+dbt build  # Build all models
+
+# Snowflake native deployment
+snow dbt deploy automated_intelligence_dbt_project \
+  --connection <your-connection-name> \
+  --force
+
+snow dbt execute automated_intelligence_dbt_project \
+  --connection <your-connection-name> \
+  --args "build --target dev"
+```
+
+**Models created:**
+- **Staging** (4 views in `dbt_staging` schema): stg_customers, stg_orders, stg_order_items, stg_products
+- **Customer marts** (2 tables in `dbt_analytics` schema): customer_lifetime_value, customer_segmentation
+- **Product marts** (2 tables): product_affinity, product_recommendations
+- **Cohort marts** (1 table): monthly_cohorts
+
+**Key insights:**
+- Complements real-time Dynamic Tables with deep analytical queries
+- RFM-based customer segmentation (Recency, Frequency, Monetary)
+- Market basket analysis for product recommendations
+- Cohort retention tracking for growth analysis
+
+**Integration with real-time pipeline:**
+| Layer | Technology | Refresh | Purpose |
+|-------|-----------|---------|---------|
+| Real-Time | Dynamic Tables | 1-min lag | Operational dashboards, live metrics |
+| Analytical | dbt | Daily batch | Deep analytics, ML features, segmentation |
+
+**See:** `dbt-analytics/README.md` for model details and `dbt-analytics/DEPLOYMENT.md` for production deployment
 
 ---
 
@@ -465,294 +620,6 @@ CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(2, 3, 'LOW_ENGAGE
 - Available segments: LOW_ENGAGEMENT, HIGH_VALUE_INACTIVE, NEW_CUSTOMERS, AT_RISK, HIGH_VALUE_ACTIVE
 
 **See:** `ml-training/README.md` (Step 4) for complete deployment guide and Cortex Agent integration
-
----
-
-### DEMO 5: DBT Analytics - Batch Analytical Models
-
-**What it demonstrates:**
-- Batch-processed analytical models in Snowflake Workspaces complementing real-time Dynamic Tables
-- Customer lifetime value and segmentation
-- Product affinity and recommendations
-- Monthly cohort retention analysis
-
-**Quick start:**
-```bash
-cd dbt-analytics
-
-# Local development
-pip install dbt-snowflake
-dbt deps
-dbt debug  # Test connection
-dbt build  # Build all models
-
-# Snowflake native deployment
-snow dbt deploy automated_intelligence_dbt_project \
-  --connection <your-connection-name> \
-  --force
-
-snow dbt execute automated_intelligence_dbt_project \
-  --connection <your-connection-name> \
-  --args "build --target dev"
-```
-
-**Models created:**
-- **Staging** (4 views in `dbt_staging` schema): stg_customers, stg_orders, stg_order_items, stg_products
-- **Customer marts** (2 tables in `dbt_analytics` schema): customer_lifetime_value, customer_segmentation
-- **Product marts** (2 tables): product_affinity, product_recommendations
-- **Cohort marts** (1 table): monthly_cohorts
-
-**Key insights:**
-- Complements real-time Dynamic Tables with deep analytical queries
-- RFM-based customer segmentation (Recency, Frequency, Monetary)
-- Market basket analysis for product recommendations
-- Cohort retention tracking for growth analysis
-
-**Integration with real-time pipeline:**
-| Layer | Technology | Refresh | Purpose |
-|-------|-----------|---------|---------|
-| Real-Time | Dynamic Tables | 1-min lag | Operational dashboards, live metrics |
-| Analytical | dbt | Daily batch | Deep analytics, ML features, segmentation |
-
-**See:** `dbt-analytics/README.md` for model details and `dbt-analytics/DEPLOYMENT.md` for production deployment
-
----
-
-### DEMO 3: Dynamic Tables Pipeline
-
-**What it demonstrates:**
-- Incremental refresh (only process changes, not full datasets)
-- Automatic dependency management (DOWNSTREAM cascading)
-- Zero-maintenance orchestration (set once, runs forever)
-
-**Quick start:**
-```sql
--- Generate new orders via Snowpipe Streaming
--- See: snowpipe-streaming-java/ or snowpipe-streaming-python/
-
--- Manually refresh each tier (production: automatic!)
-ALTER DYNAMIC TABLE enriched_orders REFRESH;
-ALTER DYNAMIC TABLE fact_orders REFRESH;
-ALTER DYNAMIC TABLE daily_business_metrics REFRESH;
-
--- Verify incremental refresh
-SELECT name, refresh_action, duration_seconds
-FROM TABLE(INFORMATION_SCHEMA.DYNAMIC_TABLE_REFRESH_HISTORY(...));
-```
-
-**Key insight:** All refreshes show `INCREMENTAL` - only new data processed, not entire dataset!
-
-**See:** `DEMO_SCRIPT.md` (Demo 2) for complete step-by-step guide
-
----
-
-### DEMO 4: Interactive Tables & Warehouses
-
-**What it demonstrates:**
-- Low query latency under high concurrency
-- Performance improvement over standard warehouses
-- Complete native stack (no Redis, no external API database)
-
-**Quick start:**
-```bash
-cd interactive
-./demo.sh --threads <concurrent-threads> --warehouse both
-```
-
-**Sample queries displayed:**
-- CUSTOMER_LOOKUP: Point lookup by customer_id
-- ORDER_LOOKUP: Point lookup by order_id  
-- CUSTOMER_SUMMARY: Aggregation by customer_id
-
-**Expected results:**
-
-Interactive warehouses provide improved query performance under high concurrency compared to standard warehouses. Results vary based on workload patterns, query complexity, and data volume.
-
-**See:** `interactive/README.md` for complete documentation
-
----
-
-### DEMO 1: Snowpipe Streaming - High-Scale Ingestion
-
-**What it demonstrates:**
-- High-performance real-time ingestion
-- Linear horizontal scaling (1 to 50+ parallel instances)
-- Python AND Java implementations (identical functionality)
-
-**Implementation Options:**
-
-#### Option 1: Python (Recommended for Quick Start)
-```bash
-cd snowpipe-streaming-python
-
-# Single instance
-python src/automated_intelligence_streaming.py <num-orders>
-
-# Parallel instances
-python src/parallel_streaming_orchestrator.py <total-orders> <num-instances>
-
-# Large scale
-python src/parallel_streaming_orchestrator.py <total-orders> <num-instances>
-```
-
-#### Option 2: Java
-```bash
-cd snowpipe-streaming-java
-
-# Build
-mvn clean install
-
-# Single instance
-java -jar target/automated-intelligence-streaming-1.0.0.jar <num-orders>
-
-# Parallel instances
-java ParallelStreamingOrchestrator <total-orders> <num-instances>
-```
-
-**Performance characteristics:**
-- Single instance: Fast ingestion with low latency
-- Parallel instances: Linear scaling for high throughput
-- Large-scale: Horizontal scaling to handle massive volumes
-- Massive-scale: Achievable with sufficient parallel instances
-
-**See:** 
-- Python: `snowpipe-streaming-python/README.md`
-- Java: `snowpipe-streaming-java/README.md`
-
----
-
-### DEMO 9: Security & Governance - Row-Based Access Control
-
-**What it demonstrates:**
-- Transparent row-level security with AI agents
-- Same agent, dramatically different answers based on role
-- Zero application code changes
-
-**The setup:**
-
-Different roles see different data based on row access policies:
-
-| Role | States Visible | Revenue Visible | Customers Visible |
-|------|---------------|-----------------|-------------------|
-| **ADMIN** | All states | Full revenue | All customers |
-| **WEST_COAST** | CA, OR, WA only | Regional revenue | Regional customers |
-
-**Quick test:**
-```sql
--- Window 1: Admin role
-USE ROLE snowflake_intelligence_admin;
-SELECT state, SUM(revenue) FROM orders GROUP BY state;
--- Shows: All states with full revenue data
-
--- Window 2: West Coast role
-USE ROLE west_coast_manager;
-SELECT state, SUM(revenue) FROM orders GROUP BY state;
--- Shows: Only CA, OR, WA states with regional revenue data
-```
-
-**Key insight:** West Coast Manager doesn't even know other states exist - filtered at database level!
-
-**See:** `security-and-governance/README.md` for setup and agent demos
-
----
-
-### DEMO 10: Snowflake Postgres - Hybrid OLTP/OLAP Architecture
-
-**What it demonstrates:**
-- Hybrid architecture: Postgres for OLTP (transactional writes), Snowflake for OLAP (analytics)
-- MERGE-based sync from Postgres to Snowflake via scheduled task
-- Iceberg export with automated incremental refresh (every 5 minutes)
-- pg_lake: External Postgres querying Snowflake Iceberg data
-- Cortex Search services for semantic search over synced data
-- Natural language queries via Cortex Agent
-
-**Architecture:**
-```
-Postgres (OLTP)                    Snowflake (OLAP)
-┌─────────────────┐               ┌─────────────────────────────┐
-│ product_reviews │               │ RAW.PRODUCT_REVIEWS         │
-│ support_tickets │               │ RAW.SUPPORT_TICKETS         │
-└─────────────────┘               └─────────────────────────────┘
-        │                                     │
-        │ POSTGRES_SYNC_TASK (5 min)          │ PG_LAKE_REFRESH_TASK (5 min)
-        └─────────────►───────────────────────┼──────────────►
-                                              ▼
-                                  ┌─────────────────────────────┐
-                                  │ PG_LAKE.PRODUCT_REVIEWS     │
-                                  │ PG_LAKE.SUPPORT_TICKETS     │
-                                  │ (Iceberg tables → S3)       │
-                                  └─────────────────────────────┘
-                                              │
-                                              ▼
-                                  ┌─────────────────────────────┐
-                                  │ pg_lake (External Postgres) │
-                                  │ Reads Iceberg from S3       │
-                                  └─────────────────────────────┘
-```
-
-**Quick start:**
-```bash
-# Setup Snowflake Postgres sync task
-cd snowflake-postgres
-snow sql -c dash-builder-si -f 05_create_sync_task.sql
-
-# Setup pg_lake Iceberg tables and task
-cd ../pg_lake
-snow sql -c dash-builder-si -f snowflake_export.sql
-
-# Start pg_lake (fetches latest Iceberg paths from Snowflake)
-./setup.sh
-
-# Run demo queries
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres --pset pager=off -f demo_queries.sql
-```
-
-**Two automated tasks:**
-
-| Task | Source → Target | Schedule |
-|------|-----------------|----------|
-| `POSTGRES_SYNC_TASK` | Snowflake Postgres → RAW | 5 min |
-| `PG_LAKE_REFRESH_TASK` | RAW → Iceberg on S3 | 5 min |
-
-**Verify task status:**
-```sql
--- Check both tasks
-SHOW TASKS LIKE 'POSTGRES_SYNC_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
-SHOW TASKS LIKE 'PG_LAKE_REFRESH_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.PG_LAKE;
-
-SELECT NAME, STATE, SCHEDULED_TIME FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
-WHERE NAME IN ('POSTGRES_SYNC_TASK', 'PG_LAKE_REFRESH_TASK')
-ORDER BY SCHEDULED_TIME DESC LIMIT 5;
-```
-
-**Test search services:**
-```sql
--- Search product reviews
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'AUTOMATED_INTELLIGENCE.SEMANTIC.PRODUCT_REVIEWS_SEARCH',
-        '{"query": "quality issues with boots", "columns": ["review_title", "review_text", "rating"], "limit": 5}'
-    )
-)['results'] AS results;
-
--- Search support tickets
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'AUTOMATED_INTELLIGENCE.SEMANTIC.SUPPORT_TICKETS_SEARCH',
-        '{"query": "shipping delays", "columns": ["subject", "description", "priority"], "limit": 5}'
-    )
-)['results'] AS results;
-```
-
-**Key insights:**
-- Postgres excels at OLTP (high-frequency transactional writes)
-- Snowflake excels at OLAP (analytics, AI, complex queries)
-- MERGE-based sync is production-realistic (vs DELETE+INSERT)
-- Iceberg export enables external systems to query Snowflake data
-- Smart change detection avoids unnecessary S3 metadata writes
-- Cortex Search enables semantic search without manual indexing
-
-**See:** `pg_lake/README.md` for detailed setup and architecture
 
 ---
 
@@ -885,9 +752,174 @@ User: "Get 10 at-risk customers with their top 5 product recommendations"
 - **Formatted output** perfect for business users
 - **Production-ready** with deterministic results
 
-**See:** `snowflake-intelligence/README.md` for agent tool definition and complete integration guide
-
 **See:** `snowflake-intelligence/README.md` for detailed setup, semantic model customization, and troubleshooting
+
+---
+
+### DEMO 9: Security & Governance - Row-Based Access Control
+
+**What it demonstrates:**
+- Transparent row-level security with AI agents
+- Same agent, dramatically different answers based on role
+- Zero application code changes
+
+**The setup:**
+
+Different roles see different data based on row access policies:
+
+| Role | States Visible | Revenue Visible | Customers Visible |
+|------|---------------|-----------------|-------------------|
+| **ADMIN** | All states | Full revenue | All customers |
+| **WEST_COAST** | CA, OR, WA only | Regional revenue | Regional customers |
+
+**Quick test:**
+```sql
+-- Window 1: Admin role
+USE ROLE snowflake_intelligence_admin;
+SELECT state, SUM(revenue) FROM orders GROUP BY state;
+-- Shows: All states with full revenue data
+
+-- Window 2: West Coast role
+USE ROLE west_coast_manager;
+SELECT state, SUM(revenue) FROM orders GROUP BY state;
+-- Shows: Only CA, OR, WA states with regional revenue data
+```
+
+**Key insight:** West Coast Manager doesn't even know other states exist - filtered at database level!
+
+**See:** `security-and-governance/README.md` for setup and agent demos
+
+---
+
+### DEMO 10: Snowflake Postgres - Hybrid OLTP/OLAP Architecture
+
+**What it demonstrates:**
+- Hybrid architecture: Postgres for OLTP (transactional writes), Snowflake for OLAP (analytics)
+- MERGE-based sync from Postgres to Snowflake via scheduled task
+- Iceberg export with automated incremental refresh (every 5 minutes)
+- Cortex Search services for semantic search over synced data
+- Natural language queries via Cortex Agent
+
+**Architecture:**
+```
+┌─────────────────────┐      Sync task      ┌─────────────────────┐
+│ SNOWFLAKE POSTGRES  │      (5 min)        │ SNOWFLAKE RAW       │
+│ (managed OLTP)      │ ─────────────────►  │                     │
+│                     │                     │ product_reviews     │
+│ product_reviews     │                     │ support_tickets     │
+│ support_tickets     │                     │                     │
+└─────────────────────┘                     └──────────┬──────────┘
+                                                       │
+                                                       │ Sync task (5 min)
+                                                       ▼
+                                            ┌─────────────────────┐
+                                            │ ICEBERG ON S3       │
+                                            │ (open format)       │
+                                            │                     │
+                                            │ product_reviews     │
+                                            │ support_tickets     │
+                                            └──────────┬──────────┘
+                                                       │
+                                                       │ Reads directly
+                                                       ▼
+                                            ┌─────────────────────┐
+                                            │ pg_lake             │
+                                            │ (external Postgres) │
+                                            └─────────────────────┘
+```
+
+**Quick start:**
+```bash
+# Setup Snowflake Postgres sync task
+cd snowflake-postgres
+snow sql -c dash-builder-si -f 05_create_sync_task.sql
+
+# Setup pg_lake Iceberg tables and task
+cd ../pg_lake
+snow sql -c dash-builder-si -f snowflake_export.sql
+
+# Start pg_lake (fetches latest Iceberg paths from Snowflake)
+./setup.sh
+
+# Run demo queries
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres --pset pager=off -f demo_queries.sql
+```
+
+**Two automated tasks:**
+
+| Task | Source → Target | Schedule |
+|------|-----------------|----------|
+| `POSTGRES_SYNC_TASK` | Snowflake Postgres → RAW | 5 min |
+| `PG_LAKE_REFRESH_TASK` | RAW → Iceberg on S3 | 5 min |
+
+**Verify task status:**
+```sql
+-- Check both tasks
+SHOW TASKS LIKE 'POSTGRES_SYNC_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
+SHOW TASKS LIKE 'PG_LAKE_REFRESH_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.PG_LAKE;
+
+SELECT NAME, STATE, SCHEDULED_TIME FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE NAME IN ('POSTGRES_SYNC_TASK', 'PG_LAKE_REFRESH_TASK')
+ORDER BY SCHEDULED_TIME DESC LIMIT 5;
+```
+
+**Test search services:**
+```sql
+-- Search product reviews
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.PRODUCT_REVIEWS_SEARCH',
+        '{"query": "quality issues with boots", "columns": ["review_title", "review_text", "rating"], "limit": 5}'
+    )
+)['results'] AS results;
+
+-- Search support tickets
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'AUTOMATED_INTELLIGENCE.SEMANTIC.SUPPORT_TICKETS_SEARCH',
+        '{"query": "shipping delays", "columns": ["subject", "description", "priority"], "limit": 5}'
+    )
+)['results'] AS results;
+```
+
+**Key insights:**
+- Postgres excels at OLTP (high-frequency transactional writes)
+- Snowflake excels at OLAP (analytics, AI, complex queries)
+- MERGE-based sync is production-realistic (vs DELETE+INSERT)
+- Cortex Search enables semantic search without manual indexing
+
+#### pg_lake: Open Lakehouse Interoperability
+
+**The value prop:** Query Snowflake data from *any* Iceberg-compatible engine—Spark, Trino, DuckDB, or external Postgres—without ETL pipelines or data copies.
+
+**How it works:**
+1. `PG_LAKE_REFRESH_TASK` exports RAW tables to Iceberg format on S3
+2. `setup.sh` dynamically queries Snowflake for latest Iceberg metadata paths
+3. External Postgres (pg_lake) reads Iceberg tables directly from S3
+
+**Why this matters:**
+- **No vendor lock-in** — Data stored in open Iceberg format
+- **Zero data movement** — External systems read directly from S3
+- **Always fresh** — 5-minute automated refresh keeps Iceberg current
+- **Any engine** — Spark, Trino, DuckDB, Postgres all read the same files
+
+**pg_lake quick start:**
+```bash
+cd pg_lake
+
+# Start external Postgres with Iceberg support
+./setup.sh
+
+# Query Snowflake data from external Postgres
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres -c "
+SELECT rating, COUNT(*) as count 
+FROM product_reviews 
+GROUP BY rating 
+ORDER BY rating DESC;
+"
+```
+
+**See:** `pg_lake/README.md` for detailed setup and architecture
 
 ---
 
