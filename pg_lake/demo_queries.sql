@@ -113,3 +113,23 @@ FROM support_tickets
 GROUP BY ticket_date::date
 ORDER BY date DESC
 LIMIT 14;
+
+-- ------------------------------------------------------------
+-- 6. Summary
+-- ------------------------------------------------------------
+
+SELECT '=== pg_lake Demo Summary ===' as summary
+UNION ALL
+SELECT '✓ Successfully queried Snowflake Iceberg data from Postgres'
+UNION ALL
+SELECT '✓ Product Reviews: ' || COUNT(*)::text || ' rows' FROM product_reviews
+UNION ALL
+SELECT '✓ Support Tickets: ' || COUNT(*)::text || ' rows' FROM support_tickets
+UNION ALL
+SELECT '✓ Avg Product Rating: ' || ROUND(AVG(rating)::numeric, 2)::text || ' stars' FROM product_reviews
+UNION ALL
+SELECT '✓ Open Tickets: ' || COUNT(*)::text FROM support_tickets WHERE status = 'Open'
+UNION ALL
+SELECT '✓ High Priority Open: ' || COUNT(*)::text FROM support_tickets WHERE status = 'Open' AND priority IN ('High', 'Urgent')
+UNION ALL
+SELECT '================================';

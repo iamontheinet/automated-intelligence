@@ -272,40 +272,38 @@ SELECT * FROM TABLE(pg_query('SELECT * FROM product_reviews ORDER BY created_at 
 
 **How, Why, When:**
 
-| Step | How | Why | When |
-|------|-----|-----|------|
-| **MERGE Sync** | Snowflake TASK runs `MERGE INTO RAW.PRODUCT_REVIEWS USING TABLE(pg_query(...))` | Keep Snowflake analytics in sync with Postgres OLTP writes | Every 5 minutes (scheduled task) |
-| **Iceberg Export** | `INSERT OVERWRITE INTO PG_LAKE.PRODUCT_REVIEWS SELECT * FROM RAW.PRODUCT_REVIEWS` | Make data available to external systems in open format | On-demand or scheduled (after MERGE) |
+| Step | Task | Source → Target | Schedule |
+|------|------|-----------------|----------|
+| **1. Postgres Sync** | `POSTGRES_SYNC_TASK` | Snowflake Postgres → RAW tables | Every 5 min |
+| **2. Iceberg Export** | `PG_LAKE_REFRESH_TASK` | RAW tables → Iceberg on S3 | Every 5 min |
 
-**Show sync task:**
+**Show sync tasks:**
 ```sql
--- Task runs every 5 minutes
-SHOW TASKS LIKE 'postgres_sync_task' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
+-- Both tasks run every 5 minutes
+SHOW TASKS LIKE '%SYNC%' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
+SHOW TASKS LIKE '%REFRESH%' IN SCHEMA AUTOMATED_INTELLIGENCE.PG_LAKE;
 
--- See what it does (MERGE handles INSERT, UPDATE, DELETE)
-SELECT * FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
-WHERE NAME = 'POSTGRES_SYNC_TASK' ORDER BY SCHEDULED_TIME DESC LIMIT 3;
+-- See task execution history
+SELECT NAME, STATE, SCHEDULED_TIME FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE NAME IN ('POSTGRES_SYNC_TASK', 'PG_LAKE_REFRESH_TASK')
+ORDER BY SCHEDULED_TIME DESC LIMIT 5;
 ```
 
-**The MERGE pattern:**
+**The MERGE pattern (both tasks use MERGE):**
 ```sql
--- Simplified version of what the task executes:
+-- Task 1: Postgres → RAW (SYNC_POSTGRES_TO_SNOWFLAKE procedure)
 MERGE INTO RAW.PRODUCT_REVIEWS AS target
 USING TABLE(pg_query('SELECT * FROM product_reviews')) AS source
 ON target.review_id = source.review_id
-WHEN MATCHED THEN UPDATE SET ...   -- handles updates
-WHEN NOT MATCHED THEN INSERT ...   -- handles inserts
--- Deletes handled via soft-delete flag or separate reconciliation
-```
+WHEN MATCHED THEN UPDATE SET ...
+WHEN NOT MATCHED THEN INSERT ...;
 
-**Iceberg export (creates open-format data on S3):**
-```sql
--- Refresh Iceberg table from RAW (can be scheduled after MERGE)
-INSERT OVERWRITE INTO AUTOMATED_INTELLIGENCE.PG_LAKE.PRODUCT_REVIEWS
-SELECT * FROM AUTOMATED_INTELLIGENCE.RAW.PRODUCT_REVIEWS;
-
--- Verify Iceberg metadata location
-SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION('AUTOMATED_INTELLIGENCE.PG_LAKE.PRODUCT_REVIEWS');
+-- Task 2: RAW → Iceberg (PG_LAKE_REFRESH_TASK)
+MERGE INTO PG_LAKE.PRODUCT_REVIEWS AS target
+USING RAW.PRODUCT_REVIEWS AS source
+ON target.review_id = source.review_id
+WHEN MATCHED THEN UPDATE SET ...
+WHEN NOT MATCHED THEN INSERT ...;
 ```
 
 **Verify sync:**
@@ -328,10 +326,10 @@ SELECT 'Iceberg', COUNT(*) FROM AUTOMATED_INTELLIGENCE.PG_LAKE.PRODUCT_REVIEWS;
 **The data path (with timing):**
 ```
 Snowflake Postgres    →    Snowflake RAW     →    Iceberg on S3    →    pg_lake
-   (writes)              (MERGE every 5 min)    (export on-demand)     (reads anytime)
-       │                         │                      │                   │
-   OLTP app                 Analytics              Open format          External
-   inserts here             queries here           stored here          reads here
+   (writes)            POSTGRES_SYNC_TASK    PG_LAKE_REFRESH_TASK     (reads anytime)
+       │                   (5 min)               (5 min)                   │
+   OLTP app                 Analytics          Open format            External
+   inserts here            queries here        stored here            reads here
 ```
 
 **Connect to external Postgres (pg_lake):**
@@ -416,7 +414,8 @@ CALL pg_exec('INSERT INTO product_reviews (customer_id, product_id, product_name
 
 ### If pg_lake container not running:
 ```bash
-docker compose -f /Users/ddesai/Apps/automated-intelligence/pg_lake/docker-compose.yml up -d
+cd /Users/dashdesai/Apps/automated-intelligence/pg_lake
+./setup.sh  # Fetches latest Iceberg paths and starts containers
 ```
 
 ### Check Intelligence agent status:

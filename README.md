@@ -661,6 +661,8 @@ SELECT state, SUM(revenue) FROM orders GROUP BY state;
 **What it demonstrates:**
 - Hybrid architecture: Postgres for OLTP (transactional writes), Snowflake for OLAP (analytics)
 - MERGE-based sync from Postgres to Snowflake via scheduled task
+- Iceberg export with automated incremental refresh (every 5 minutes)
+- pg_lake: External Postgres querying Snowflake Iceberg data
 - Cortex Search services for semantic search over synced data
 - Natural language queries via Cortex Agent
 
@@ -668,35 +670,59 @@ SELECT state, SUM(revenue) FROM orders GROUP BY state;
 ```
 Postgres (OLTP)                    Snowflake (OLAP)
 ┌─────────────────┐               ┌─────────────────────────────┐
-│ product_reviews │ ──MERGE sync──│ RAW.PRODUCT_REVIEWS         │
-│ support_tickets │    (5 min)    │ RAW.SUPPORT_TICKETS         │
+│ product_reviews │               │ RAW.PRODUCT_REVIEWS         │
+│ support_tickets │               │ RAW.SUPPORT_TICKETS         │
 └─────────────────┘               └─────────────────────────────┘
-                                              │
+        │                                     │
+        │ POSTGRES_SYNC_TASK (5 min)          │ PG_LAKE_REFRESH_TASK (5 min)
+        └─────────────►───────────────────────┼──────────────►
                                               ▼
                                   ┌─────────────────────────────┐
-                                  │ Cortex Search Services      │
-                                  │ • product_reviews_search    │
-                                  │ • support_tickets_search    │
+                                  │ PG_LAKE.PRODUCT_REVIEWS     │
+                                  │ PG_LAKE.SUPPORT_TICKETS     │
+                                  │ (Iceberg tables → S3)       │
                                   └─────────────────────────────┘
                                               │
                                               ▼
                                   ┌─────────────────────────────┐
-                                  │ Cortex Agent                │
-                                  │ Natural language queries    │
+                                  │ pg_lake (External Postgres) │
+                                  │ Reads Iceberg from S3       │
                                   └─────────────────────────────┘
 ```
 
 **Quick start:**
 ```bash
+# Setup Snowflake Postgres sync task
 cd snowflake-postgres
-
-# Setup external access and sync
-snow sql -c dash-builder-si -f 02_setup_external_access.sql
-snow sql -c dash-builder-si -f 03_create_query_functions.sql
 snow sql -c dash-builder-si -f 05_create_sync_task.sql
 
-# Create Cortex Search services
-snow sql -c dash-builder-si -f ../snowflake-intelligence/create_postgres_search_services.sql
+# Setup pg_lake Iceberg tables and task
+cd ../pg_lake
+snow sql -c dash-builder-si -f snowflake_export.sql
+
+# Start pg_lake (fetches latest Iceberg paths from Snowflake)
+./setup.sh
+
+# Run demo queries
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres --pset pager=off -f demo_queries.sql
+```
+
+**Two automated tasks:**
+
+| Task | Source → Target | Schedule |
+|------|-----------------|----------|
+| `POSTGRES_SYNC_TASK` | Snowflake Postgres → RAW | 5 min |
+| `PG_LAKE_REFRESH_TASK` | RAW → Iceberg on S3 | 5 min |
+
+**Verify task status:**
+```sql
+-- Check both tasks
+SHOW TASKS LIKE 'POSTGRES_SYNC_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
+SHOW TASKS LIKE 'PG_LAKE_REFRESH_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.PG_LAKE;
+
+SELECT NAME, STATE, SCHEDULED_TIME FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE NAME IN ('POSTGRES_SYNC_TASK', 'PG_LAKE_REFRESH_TASK')
+ORDER BY SCHEDULED_TIME DESC LIMIT 5;
 ```
 
 **Test search services:**
@@ -722,9 +748,11 @@ SELECT PARSE_JSON(
 - Postgres excels at OLTP (high-frequency transactional writes)
 - Snowflake excels at OLAP (analytics, AI, complex queries)
 - MERGE-based sync is production-realistic (vs DELETE+INSERT)
+- Iceberg export enables external systems to query Snowflake data
+- Smart change detection avoids unnecessary S3 metadata writes
 - Cortex Search enables semantic search without manual indexing
 
-**See:** `snowflake-postgres/README.md` for detailed setup and architecture
+**See:** `pg_lake/README.md` for detailed setup and architecture
 
 ---
 
