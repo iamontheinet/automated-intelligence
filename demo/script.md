@@ -1541,33 +1541,79 @@ Navigate to **AI & ML > Snowflake Intelligence** and ask:
 
 ### Step 5: pg_lake - Open Lakehouse (Optional Extension)
 
+**What is pg_lake?**
+> An *external* PostgreSQL instance (not Snowflake Postgres) that reads Iceberg tables directly from S3. This demonstrates how ANY Iceberg-compatible system can access Snowflake data in open formats.
+
 **Setup (one-time):**
 ```bash
-# Create Iceberg tables for external Postgres access
-snow sql -c <your-connection-name> -f pg_lake/snowflake_export.sql
+cd pg_lake
+
+# Create Iceberg tables, stored procedure, and task in Snowflake
+snow sql -c dash-builder-si -f snowflake_export.sql
+
+# Start pg_lake with dynamic Iceberg path discovery
+./setup.sh
 ```
 
-**Demo Query from external Postgres:**
-```sql
--- Query Snowflake data from pg_lake foreign tables
-SELECT * FROM product_reviews_iceberg LIMIT 5;
-SELECT * FROM support_tickets_iceberg LIMIT 5;
+**How it works:**
 
--- Verify row counts match
-SELECT COUNT(*) FROM product_reviews_iceberg;  -- Should match Snowflake
-SELECT COUNT(*) FROM support_tickets_iceberg;  -- Should match Snowflake
+Two Snowflake Tasks automate the data flow:
+
+| Task | Source → Target | Schedule |
+|------|-----------------|----------|
+| `POSTGRES_SYNC_TASK` | Snowflake Postgres → RAW tables | 5 min |
+| `PG_LAKE_REFRESH_TASK` | RAW tables → Iceberg on S3 | 5 min |
+
+The `setup.sh` script queries Snowflake for latest Iceberg metadata paths, then pg_lake foreign tables point to that metadata on S3.
+
+**Demo Query from external Postgres:**
+```bash
+# Run demo queries
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres --pset pager=off -f demo_queries.sql
+```
+
+```sql
+-- Query Snowflake data from external Postgres via Iceberg
+SELECT rating, COUNT(*) as count
+FROM product_reviews
+GROUP BY rating
+ORDER BY rating DESC;
+
+-- Verify row counts match Snowflake
+SELECT 'product_reviews' as table_name, COUNT(*) FROM product_reviews
+UNION ALL
+SELECT 'support_tickets', COUNT(*) FROM support_tickets;
+```
+
+**Check task status in Snowflake:**
+```sql
+-- View both tasks
+SHOW TASKS LIKE 'POSTGRES_SYNC_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.POSTGRES;
+SHOW TASKS LIKE 'PG_LAKE_REFRESH_TASK' IN SCHEMA AUTOMATED_INTELLIGENCE.PG_LAKE;
+
+-- View task history
+SELECT NAME, STATE, SCHEDULED_TIME FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE NAME IN ('POSTGRES_SYNC_TASK', 'PG_LAKE_REFRESH_TASK')
+ORDER BY SCHEDULED_TIME DESC LIMIT 5;
 ```
 
 **What to say:**
-> "This is true lakehouse architecture. Snowflake exports data as Iceberg tables to S3, and external Postgres instances can read that data directly via pg_lake foreign tables.
+> "This is true Open Lakehouse architecture with fully automated data pipelines:
+>
+> **Two Tasks, Full Automation:**
+> - `POSTGRES_SYNC_TASK`: Syncs Snowflake Postgres → RAW tables (every 5 min)
+> - `PG_LAKE_REFRESH_TASK`: Syncs RAW → Iceberg on S3 (every 5 min)
+>
+> **Dynamic path discovery:**
+> - The setup script queries Snowflake for current Iceberg metadata paths
+> - No hardcoded S3 paths to maintain
+> - Just run `./setup.sh` to pick up the latest metadata
 >
 > **Key benefits:**
 > - **Open Data Format:** Iceberg is an open table format - not locked into any vendor
-> - **Schema Evolution:** Iceberg handles schema changes gracefully
-> - **Snapshot Semantics:** External systems read consistent snapshots
-> - **Multi-Engine Analytics:** Same data accessible from Snowflake, Spark, Trino, or any Iceberg-compatible system
->
-> This demonstrates Snowflake's commitment to open standards and interoperability."
+> - **Multi-Engine Analytics:** Same data accessible from Snowflake, Spark, Trino, DuckDB, or any Iceberg-compatible system
+> - **No ETL Required:** External systems read directly from S3
+> - **True Lakehouse:** Open formats, universal access, governed by Snowflake"
 
 **See:** `pg_lake/README.md` for external Postgres setup and architecture
 

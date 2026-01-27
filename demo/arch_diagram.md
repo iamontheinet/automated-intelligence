@@ -22,9 +22,10 @@ Build analytics pipelines faster with AI-powered developer tools. Train product 
 
 **DEMO 3: Data + Intelligence**
 - Snowflake Postgres → Product reviews and Support tickets (managed OLTP for transactional writes)
-- MERGE Sync → Scheduled task syncing Postgres to RAW tables (real-time OLTP/OLAP unification)
+  - POSTGRES_SYNC_TASK → Scheduled task syncing Postgres to RAW tables every 5 min (real-time OLTP/OLAP unification)
 - Iceberg Export → Export to open format on S3 (no vendor lock-in)
-- pg_lake → Query Snowflake data from external Postgres (Iceberg interoperability)
+  - PG_LAKE_REFRESH_TASK → Scheduled task syncing RAW to Iceberg every 5 min (automated export)
+- pg_lake → Query Snowflake data from external Postgres via Iceberg (open lakehouse interoperability)
 - Snowflake Intelligence → Business users ask questions in plain English (Analyst + Search + ML)
 - REST API → Embed AI insights into apps, dashboards, and workflows
 
@@ -57,23 +58,23 @@ Build analytics pipelines faster with AI-powered developer tools. Train product 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    DEMO 3: DATA + INTELLIGENCE                              │
 │                                                                             │
-│   ┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐  │
-│   │ SNOWFLAKE        │      │ SNOWFLAKE        │      │ ICEBERG ON S3    │  │
-│   │ POSTGRES         │ ───► │ (RAW tables)     │ ───► │ (open format)    │  │
-│   │ (managed OLTP)   │ MERGE│                  │export│                  │  │
-│   │                  │ sync │ product_reviews  │      │ product_reviews  │  │
-│   │ product_reviews  │      │ support_tickets  │      │ support_tickets  │  │
-│   │ support_tickets  │      │                  │      │                  │  │
-│   └──────────────────┘      └────────┬─────────┘      └────────┬─────────┘  │
-│                                      │                         │            │
-│                                      ▼                         ▼            │
-│                          Snowflake Intelligence           pg_lake           │
-│                          ┌─────────────────────┐    (external Postgres)     │
-│                          │ Cortex Analyst      │          │                 │
-│                          │ Cortex Search       │          ▼                 │
-│                          │ Custom ML Tools     │    Any Iceberg-compatible  │
-│                          └──────────┬──────────┘    system can query this   │
-│                                     │               data (Spark, Trino,     │
-│                                     ▼               DuckDB, etc.)           │
+│  ┌──────────────────┐       ┌──────────────────┐       ┌──────────────────┐ │
+│  │ SNOWFLAKE        │       │ SNOWFLAKE        │       │ ICEBERG ON S3    │ │
+│  │ POSTGRES         │ Sync  │ (RAW tables)     │ Sync  │ (open format)    │ │
+│  │ (managed OLTP)   │ task  │                  │ task  │                  │ │
+│  │                  │ ────► │ product_reviews  │ ────► │ product_reviews  │ │
+│  │ product_reviews  │(5 min)│ support_tickets  │(5 min)│ support_tickets  │ │
+│  │ support_tickets  │       │                  │       │                  │ │
+│  └──────────────────┘       └────────┬─────────┘       └────────┬─────────┘ │
+│                                      │                          │           │
+│                                      ▼                          ▼           │
+│                          Snowflake Intelligence             pg_lake         │
+│                          ┌─────────────────────┐      (external Postgres)   │
+│                          │ Cortex Analyst      │            │               │
+│                          │ Cortex Search       │            ▼               │
+│                          │ Custom ML Tools     │      Any Iceberg-capable   │
+│                          └──────────┬──────────┘      engine (Spark, Trino, │
+│                                     │                 DuckDB, etc.)         │
+│                                     ▼                                       │
 │                                 REST API                                    │
 └─────────────────────────────────────────────────────────────────────────────┘
