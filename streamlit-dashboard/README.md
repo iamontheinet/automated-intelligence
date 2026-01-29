@@ -58,14 +58,14 @@ A Streamlit dashboard that monitors Snowpipe Streaming ingestion and Interactive
 
 1. **Deploy using Snowflake CLI:**
    ```bash
-   snow streamlit deploy pipeline_dashboard --replace -c dash-builder-si
+   snow streamlit deploy the_dashboard --replace -c dash-builder-si
    ```
    
    Note: This uses the `snowflake.yml` project definition file to configure the app's database, schema, warehouse, and other settings.
 
 2. **Get app URL:**
    ```bash
-   snow streamlit get-url AUTOMATED_INTELLIGENCE.RAW.PIPELINE_DASHBOARD -c dash-builder-si
+   snow streamlit get-url AUTOMATED_INTELLIGENCE.RAW.THE_DASHBOARD -c dash-builder-si
    ```
 
 ## Dashboard Tabs
@@ -208,10 +208,10 @@ streamlit run streamlit_app.py --server.port 8502
 ```sql
 -- Check app status
 SHOW STREAMLITS;
-DESC STREAMLIT AUTOMATED_INTELLIGENCE.RAW.PIPELINE_DASHBOARD;
+DESC STREAMLIT AUTOMATED_INTELLIGENCE.RAW.the_dashboard;
 
 -- Verify warehouse is set
-ALTER STREAMLIT AUTOMATED_INTELLIGENCE.RAW.PIPELINE_DASHBOARD 
+ALTER STREAMLIT AUTOMATED_INTELLIGENCE.RAW.the_dashboard 
   SET QUERY_WAREHOUSE = AUTOMATED_INTELLIGENCE_WH;
 ```
 

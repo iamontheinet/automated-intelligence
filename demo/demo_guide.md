@@ -27,8 +27,8 @@ A retail company modernizes their entire data stack on Snowflake—from developm
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         DEMO 2: NOTEBOOKS + ML                              │
 │                                                                             │
-│   Workspaces (Git) ──→ Notebook vNext (GPU) ──→ Model Registry ──→ Service │
-│                              │                        │              Endpoint│
+│   Workspaces (Git) ──→ Notebook vNext (GPU) ──→ Model Registry ──→ Service  │
+│                              │                        │            Endpoint │
 │                              ▼                        ▼                     │
 │                     XGBoost Training         Versioned Models               │
 │                     (gpu_hist)                       │                      │
@@ -85,7 +85,7 @@ A retail company modernizes their entire data stack on Snowflake—from developm
 
 **Open Cortex Code:**
 ```bash
-cortex-code
+cortex -c dash-connection-si
 ```
 
 **Ask for SQL:**
@@ -130,9 +130,9 @@ WHERE order_date >= DATEADD(day, -30, CURRENT_DATE);
 
 #### 3:30 - Snow CLI (1.5 min)
 
-**List objects:**
+**List tables:**
 ```bash
-snow object list tables --database AUTOMATED_INTELLIGENCE --schema RAW
+snow object list table --in schema RAW
 ```
 
 **Run query:**
@@ -140,9 +140,15 @@ snow object list tables --database AUTOMATED_INTELLIGENCE --schema RAW
 snow sql -q "SELECT COUNT(*) FROM AUTOMATED_INTELLIGENCE.RAW.CUSTOMERS"
 ```
 
-**Deploy stored procedure:**
+**Run Streamlit app locally:**
 ```bash
-snow snowpark deploy --replace
+cd streamlit-dashboard
+streamlit run streamlit_app.py --server.port 8501
+```
+
+**Deploy to Snowflake:**
+```bash
+snow streamlit deploy the_dashboard --replace -c dash-builder-si
 ```
 
 **Transition:** *"Now let's see how we train ML models using these same tools..."*
