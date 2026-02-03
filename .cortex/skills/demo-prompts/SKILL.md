@@ -57,7 +57,6 @@ Always use fully qualified names: `AUTOMATED_INTELLIGENCE.SCHEMA.TABLE`.
 - `models/marts/cohort/monthly_cohorts.sql` - Cohort retention analysis
 
 **For Prompt 2** (show churn risk model): Display model code without writing files
-**For Prompt 3** (explain CLV): Read directly from `models/marts/customer/customer_lifetime_value.sql`
 
 ### Python File Paths (DO NOT search - use these exact paths)
 
@@ -69,11 +68,10 @@ Always use fully qualified names: `AUTOMATED_INTELLIGENCE.SCHEMA.TABLE`.
 - `src/config_manager.py` - Configuration loading
 - `src/reconciliation_manager.py` - Data reconciliation logic
 
-**For Prompt 4** (code review): Read `src/data_generator.py` directly
-**For Prompt 5** (CLV dashboard): Generate Streamlit app using pattern from `streamlit-dashboard/shared.py`
-**For Prompt 6** (retry logic): Read `src/parallel_streaming_orchestrator.py` directly
+**For Prompt 3** (retry logic): Read `src/parallel_streaming_orchestrator.py` directly
+**For Prompt 4** (CLV dashboard): Generate Streamlit app using pattern from `streamlit-dashboard/shared.py`
 
-### Streamlit Connection Pattern (for Prompt 5)
+### Streamlit Connection Pattern (for Prompt 4)
 
 **IMPORTANT**: Use `st.connection("snowflake")` for LOCAL development. The `get_active_session()` method ONLY works when deployed to Snowflake's native Streamlit environment.
 
@@ -154,12 +152,10 @@ customer_id, behavioral_segment, segment_priority, recommended_action
 
 | # | Persona | Prompt | Working Directory |
 |---|---------|--------|-------------------|
-| 1 | Data Analyst | Generate a SQL query for the top 10 customers by total spend and save to demo-output/ | (root) |
+| 1 | Data Analyst | Show me monthly revenue trends with month-over-month growth rates for the last 6 months | (root) |
 | 2 | Data Engineer | Generate a dbt model for customer churn risk and save to demo-output/ | `dbt-analytics/` |
-| 3 | Data Engineer | Explain models/marts/customer/customer_lifetime_value.sql | `dbt-analytics/` |
-| 4 | Developer | Review src/data_generator.py and identify any edge cases or potential bugs | `snowpipe-streaming-python/` |
-| 5 | Developer | Generate a Streamlit app for CLV dashboard using AUTOMATED_INTELLIGENCE.DBT_ANALYTICS.customer_lifetime_value and save to demo-output/ | `streamlit-dashboard/` |
-| 6 | Developer | Generate retry logic with exponential backoff for parallel_streaming_orchestrator.py and save to demo-output/ | `snowpipe-streaming-python/` |
+| 3 | Developer | Review the parallel_streaming_orchestrator.py file and generate retry logic with exponential backoff | `snowpipe-streaming-python/` |
+| 4 | Developer | Generate a Streamlit dashboard that visualizes customer lifetime value metrics | `streamlit-dashboard/` |
 
 ## Directory Mapping
 
@@ -169,10 +165,8 @@ Before executing each prompt, **automatically change to the correct directory**:
 |--------|-----------|-----------|
 | 1 | Project root | `/Users/ddesai/Apps/automated-intelligence` |
 | 2 | dbt-analytics | `/Users/ddesai/Apps/automated-intelligence/dbt-analytics` |
-| 3 | dbt-analytics | `/Users/ddesai/Apps/automated-intelligence/dbt-analytics` |
-| 4 | snowpipe-streaming-python | `/Users/ddesai/Apps/automated-intelligence/snowpipe-streaming-python` |
-| 5 | streamlit-dashboard | `/Users/ddesai/Apps/automated-intelligence/streamlit-dashboard` |
-| 6 | snowpipe-streaming-python | `/Users/ddesai/Apps/automated-intelligence/snowpipe-streaming-python` |
+| 3 | snowpipe-streaming-python | `/Users/ddesai/Apps/automated-intelligence/snowpipe-streaming-python` |
+| 4 | streamlit-dashboard | `/Users/ddesai/Apps/automated-intelligence/streamlit-dashboard` |
 
 ## Demo Output Directory
 
@@ -184,29 +178,61 @@ This folder is safe to write to - it contains only demo-generated files and can 
 |--------|-------------|
 | 1 | `demo-output/top_customers_query.sql` |
 | 2 | `demo-output/customer_churn_risk.sql` |
-| 5 | `demo-output/clv_dashboard.py` |
-| 6 | `demo-output/retry_logic_example.py` |
+| 3 | `demo-output/retry_logic_example.py` |
+| 4 | `demo-output/clv_dashboard.py` |
 
-Prompts 3 and 4 are read/explain tasks - no output file needed.
+## Auto-Execute Behavior
 
-## Follow-Up Options
+**IMPORTANT**: After generating code or SQL, AUTOMATICALLY execute it without asking for confirmation.
 
-After completing each prompt, offer relevant follow-up actions:
+| Prompt | Auto-Execute Action |
+|--------|---------------------|
+| 1 | Execute the SQL query against Snowflake and show results |
+| 2 | Execute the dbt model SQL against Snowflake to preview results, then display the DAG |
+| 3 | Show the generated retry logic code (no execution needed) |
+| 4 | Execute `streamlit run demo-output/clv_dashboard.py` in background |
 
-| Prompt | Follow-Up Question | Action |
-|--------|-------------------|--------|
-| 1 | "Run it" or "Execute" | Execute the SQL query against Snowflake and show results |
-| 2 | "Run it" or "Execute" | Execute the dbt model SQL against Snowflake to preview results |
-| 5 | "Run it" or "Start it" | Execute `streamlit run demo-output/clv_dashboard.py` |
+**Prompt 2 DAG Display:**
+After showing query results for prompt 2, display a text-based DAG showing the model's dependencies:
 
-**Example flow:**
-1. User: "prompt 1"
-2. You: Generate SQL, save to file, show code
-3. You: "Would you like me to **run it** against Snowflake?"
-4. User: "run it"
-5. You: Execute query, display results
+```
+┌─────────────────┐     ┌─────────────────┐
+│  RAW.customers  │     │   RAW.orders    │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         └───────────┬───────────┘
+                     │
+                     ▼
+         ┌───────────────────────┐
+         │  customer_churn_risk  │
+         │    (this model)       │
+         └───────────────────────┘
+```
 
-**Follow-up triggers**: "run it", "execute", "run", "try it", "run tests", "yes"
+**Prompt 2 Model Explanation:**
+After showing the DAG, explain the model's logic in natural language:
+
+> **How this model works:**
+> 
+> This model uses **RFM analysis** (Recency, Frequency, Monetary) to predict customer churn risk:
+> 
+> 1. **Recency (50% weight)** - How recently did they order? Customers inactive for 180+ days score 0; those who ordered in the last 30 days score 100.
+> 
+> 2. **Frequency (30% weight)** - How often do they order? Customers with 10+ orders score 100; those with 0 orders score 0.
+> 
+> 3. **Monetary (20% weight)** - How much do they spend? Customers spending $5K+ score 100; those with no spend score 0.
+> 
+> The weighted scores combine into a **retention score** (0-100), which maps to risk categories:
+> - **Low Risk** (70+): Engaged customers - maintain relationship
+> - **Medium Risk** (40-69): At-risk - send win-back campaigns  
+> - **High Risk** (<40): Churning - urgent personal outreach needed
+
+**Flow for each prompt:**
+1. Generate the code/SQL
+2. Save to demo-output/
+3. Show the code in a code block
+4. **Immediately execute** (for prompts 1, 2, 4)
+5. Display results
 
 ## Instructions
 
@@ -228,19 +254,17 @@ After completing each prompt, offer relevant follow-up actions:
    - The persona introduction
    - The final SQL query (in a code block) or final code/output
    - Confirmation that file was saved (e.g., "Saved to `demo-output/top_customers_query.sql`")
+   - **Execution results** (for prompts 1, 2, 4)
    - A brief 1-2 sentence interpretation
-   - **Follow-up offer** (if applicable): "Would you like me to **run it**?"
 
 4. **After completing each prompt**, ALWAYS show the full prompt list table again with the **next prompt highlighted in bold** using `**` markers around that row's content. Example after completing prompt 1:
 
    | # | Persona | Prompt |
    |---|---------|--------|
-   | ~~1~~ | ~~Data Analyst~~ | ~~Generate SQL query for top 10 customers~~ |
+   | ~~1~~ | ~~Data Analyst~~ | ~~Show me monthly revenue trends with MoM growth~~ |
    | **2** | **Data Engineer** | **Generate dbt model for customer churn risk** |
-   | 3 | Data Engineer | Explain the CLV dbt model |
-   | 4 | Developer | Review data_generator.py for edge cases/bugs |
-   | 5 | Developer | Generate Streamlit CLV dashboard |
-   | 6 | Developer | Generate retry logic with exponential backoff |
+   | 3 | Developer | Review parallel_streaming_orchestrator.py and generate retry logic |
+   | 4 | Developer | Generate Streamlit dashboard for CLV metrics |
 
 5. Use ~~strikethrough~~ for completed prompts and **bold** for the next prompt
 
