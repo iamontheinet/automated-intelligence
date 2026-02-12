@@ -47,15 +47,11 @@ This application streams synthetic e-commerce data (customers, orders, and order
 
 ### 1. Install Dependencies
 
-**IMPORTANT: Use Snowpipe Streaming SDK v1.0.2**
-
-SDK v1.1.0 has a known JWT authentication bug (error code 390144). Use v1.0.2:
-
 ```bash
-pip install snowpipe-streaming==1.0.2
-# Or from requirements.txt
 pip install -r requirements.txt
 ```
+
+**SDK Version:** 1.1.2+ (Jan 2026) - includes Azure/GCP GA support and bug fixes.
 
 ### 2. Create Snowflake PIPE Objects
 

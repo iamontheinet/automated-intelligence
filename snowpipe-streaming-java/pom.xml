@@ -16,7 +16,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <snowpipe.streaming.version>1.0.2</snowpipe.streaming.version>
+        <snowpipe.streaming.version>1.1.2</snowpipe.streaming.version>
         <snowflake.jdbc.version>3.21.0</snowflake.jdbc.version>
         <jackson.version>2.18.1</jackson.version>
         <slf4j.version>2.0.9</slf4j.version>

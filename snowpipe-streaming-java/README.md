@@ -93,9 +93,7 @@ Offset tokens enable:
 - Network access to Snowflake
 - Snowflake account with ACCOUNTADMIN or sufficient privileges
 
-**IMPORTANT: Use Snowpipe Streaming SDK v1.0.2**
-
-SDK v1.1.0 has a known JWT authentication bug (error code 390144). The `pom.xml` is configured to use v1.0.2.
+**SDK Version:** 1.1.2 (Jan 2026) - includes Azure/GCP GA support and bug fixes.
 
 ### Snowflake Setup
 

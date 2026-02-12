@@ -35,6 +35,7 @@ snow sql -f gen2-warehouse/setup_merge_procedures.sql -c dash-builder-si
 
 **Gen2 Warehouse:**
 - `automated_intelligence_gen2_wh` - Gen2 warehouse with `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'`
+- **Optima Indexing**: Gen2 warehouses automatically create and maintain indexes for point lookup queries at no additional cost
 
 **Stored Procedures:**
 - `merge_orders_gen1()` - MERGE orders using Gen1 warehouse
@@ -45,5 +46,23 @@ snow sql -f gen2-warehouse/setup_merge_procedures.sql -c dash-builder-si
 ## Usage
 
 After setup, use the Streamlit dashboard to run Gen1 vs Gen2 comparison tests.
+
+## Optima Indexing (Automatic Performance)
+
+Gen2 warehouses include **Optima Indexing**, which automatically builds and maintains indexes behind the scenes to speed up point lookup queries. Key benefits:
+
+- **Automatic**: Snowflake analyzes your workload and creates indexes on frequently queried columns
+- **Free**: Snowflake covers all build and maintenance costs - no additional charges
+- **Transparent**: No user configuration required
+
+### Monitor Optima Performance
+```sql
+-- View index usage in query insights
+SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_INSIGHT
+WHERE WAREHOUSE_NAME = 'AUTOMATED_INTELLIGENCE_GEN2_WH'
+ORDER BY START_TIME DESC;
+
+-- Check Performance Explorer Dashboard in Snowsight for visual analysis
+```
 
 See main project README for full demo instructions.

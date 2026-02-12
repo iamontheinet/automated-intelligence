@@ -322,7 +322,7 @@ Based on **working data set** (frequently queried portion):
 ### Interactive Warehouses
 - ⚠️ **5-second query timeout** (cannot be increased)
 - ⚠️ **Always-on billing** (no auto-suspend)
-- ⚠️ **Preview feature** (select AWS regions only)
+- Available in select AWS regions (see [Region Availability](https://docs.snowflake.com/en/user-guide/interactive.html#label-interactive-region-availability))
 - ⚠️ **Cannot query standard tables** (only interactive tables)
 - ⚠️ **No multi-cluster auto-scaling** (manual scaling only)
 
@@ -338,7 +338,7 @@ Based on **working data set** (frequently queried portion):
 
 ### Interactive Warehouses
 - **Always-on billing**: No auto-suspend (by design)
-- **Minimum billable period**: 1 minute currently, changing to 1 hour in 2025
+- **Minimum billable period**: 1 hour (changed from 1 minute as of 2025)
 - **Same credit rates**: XSMALL = 1 credit/hour
 
 ### Interactive Tables
@@ -405,7 +405,11 @@ interactive/
 
 ## 🌍 Region Availability
 
-Currently available in select AWS regions:
+**Status**: Generally Available (GA since December 11, 2025)
+
+Available in select AWS regions. For the most current list, see the [official documentation](https://docs.snowflake.com/en/user-guide/interactive.html#label-interactive-region-availability).
+
+Common regions include:
 - `us-east-1` (N. Virginia)
 - `us-west-2` (Oregon)
 - `us-east-2` (Ohio)

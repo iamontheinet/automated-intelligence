@@ -1,85 +1,95 @@
-# Live Demo Script - Automated Intelligence
+# Ingestion to Intelligence
 
 ## Overview
 
-This demo suite executes a full-stack data lifecycle, starting with real-time ingestion via Snowpipe Streaming (Python/Java SDKs) and optimized DML operations on Gen2 Warehouses. It utilizes Dynamic Tables for incremental pipeline transformations and Interactive Warehouses to achieve low-latency query performance for high-concurrency serving. The workflow incorporates batch modeling via dbt in Snowflake Workspaces, GPU-accelerated ML training for recommendation engines, and Streamlit for live performance monitoring. The sequence culminates in Snowflake Intelligence, leveraging Cortex Agents for conversational analytics and data exploration—all secured by row-level access controls (RLAC) to ensure governed AI interactions.
+**Theme:** *From raw data to AI-powered insights—entirely within Snowflake.*
 
-1. **Snowpipe Streaming**: High-scale real-time ingestion (Python + Java SDKs)
-2. **Gen2 Warehouse Performance**: Next-generation MERGE/UPDATE operations
-3. **Dynamic Tables Pipeline**: Zero-maintenance incremental transformations
-4. **Interactive Tables & Warehouses**: High-concurrency serving layer (sub-100ms queries)
-5. **DBT Analytics**: Batch analytical models in Snowflake Workspaces (CLV, segmentation, cohorts)
-6. **ML Training**: GPU-accelerated product recommendation model in Snowflake Workspaces
-7. **Streamlit Dashboard**: Real-time monitoring of ingestion and performance
-8. **Snowflake Intelligence**: AI-powered conversational analytics using Cortex Agent
-9. **Security & Governance**: Row-based access control for Cortex Agents
-10. **Snowflake Postgres**: Hybrid OLTP/OLAP architecture with Cortex Search
+This demo suite executes a full-stack data lifecycle in **4 Acts**, culminating in conversational AI that understands your business. The journey flows from real-time ingestion through transformation, serving, and analytics—ending with Snowflake Intelligence where users simply ask questions in plain English.
+
+### Act 1: Ingest & Stage
+1. **Real-Time Ingestion**: Snowpipe Streaming (Python + Java SDKs)
+2. **Transformation Pipeline**: Gen2 Warehouses + Dynamic Tables
+
+### Act 2: Serve & Analyze
+3. **High-Concurrency Serving**: Interactive Tables & Warehouses (GA)
+4. **Analytics & ML**: dbt models + GPU-accelerated ML training
+
+### Act 3: Intelligence & Governance
+5. **Conversational AI**: Snowflake Intelligence with Cortex Agent
+6. **Governed AI**: Row-based access control for transparent security
+
+### Bonus: Open Lakehouse
+7. **Hybrid OLTP/OLAP**: Snowflake Postgres for transactional workloads
+8. **Iceberg Interoperability**: pg_lake demonstrates zero vendor lock-in
+
+### Parallel / Bookends
+- **Cortex Code** (Opener): AI-assisted development - "how we built this"
+- **Streamlit Dashboard** (Continuous): Real-time monitoring alongside any demo
 
 ### Demo Flow
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 1: INGESTION LAYER                                         │
-│  Snowpipe Streaming (Python/Java SDK) → Real-time ingestion     │
-│  • High-scale ready: Linear horizontal scaling                  │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 2: STAGING & DEDUPLICATION LAYER                           │
-│  Gen2 Warehouses → Staging → MERGE/UPDATE → Raw tables          │
-│  • Next-generation MERGE/UPDATE/DELETE performance              │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 3: INCREMENTAL TRANSFORMATION LAYER                        │
-│  Dynamic Tables (5 tables, 3 tiers) → Zero-maintenance          │
-│  • Tier 1 (Enrichment): 1-minute TARGET_LAG                     │
-│  • Tier 2/3 (Integration/Aggregation): DOWNSTREAM refresh       │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 4: HIGH-CONCURRENCY SERVING LAYER                          │
-│  Interactive Tables + Interactive Warehouses                     │
-│  • Sub-100ms queries under high concurrency                     │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 5: BATCH ANALYTICAL LAYER                                  │
-│  Snowflake Workspaces (dbt) → Daily/weekly batch processing     │
-│  • Customer: lifetime_value, segmentation                       │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 6: ML TRAINING LAYER                                       │
-│  Snowflake Workspaces (Notebooks + GPU) → ML training           │
-│  • XGBoost product recommendation model                         │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 7: MONITORING & OBSERVABILITY LAYER                        │
-│  Streamlit Dashboard → Real-time pipeline monitoring            │
-│  • Live ingestion metrics and performance testing               │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 8: SEMANTIC LAYER & AI INTERFACE                           │
-│  Cortex Agent + Semantic Models → Natural language analytics    │
-│  • Business terminology mapping and VQR                         │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 9: GOVERNANCE & SECURITY LAYER                             │
-│  Row Access Policies → Transparent data filtering               │
-│  • Agent-compatible row-level security                          │
-└──────────────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────────────┐
-│  DEMO 10: HYBRID OLTP/OLAP LAYER (Snowflake Postgres)            │
-│  Postgres (OLTP) → Snowflake (OLAP) → Cortex Search/Agent       │
-│  • Product reviews & support tickets in Postgres                │
-│  • MERGE-based sync via scheduled task                          │
-│  • Cortex Search for semantic search                            │
-│  • pg_lake: Iceberg tables for external Postgres read access    │
-└──────────────────────────────────────────────────────────────────┘
+                     INGESTION ─────────────────────────────► INTELLIGENCE
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  OPENER: CORTEX CODE (Optional, 5 min)                              │
+│  AI-assisted development: "Let me show you how we built this"       │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│  ACT 1: INGEST & STAGE                                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 1: Real-Time Ingestion                                        │
+│  Snowpipe Streaming (Python/Java SDK) → Linear horizontal scaling   │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 2: Transformation Pipeline                                    │
+│  Gen2 Warehouses (MERGE + Optima Indexing) → Dynamic Tables         │
+│  • Staging pattern with optimized DML                               │
+│  • 3-tier incremental refresh pipeline                              │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│  ACT 2: SERVE & ANALYZE                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 3: High-Concurrency Serving                                   │
+│  Interactive Tables + Warehouses (GA since Dec 2025)                │
+│  • Sub-100ms queries under high concurrency                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 4: Analytics & ML                                             │
+│  dbt in Workspaces → GPU Training → Model Registry                  │
+│  • CLV, segmentation, product affinity models                       │
+│  • XGBoost recommendations with gpu_hist                            │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│  ACT 3: INTELLIGENCE & GOVERNANCE                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 5: Conversational AI                                          │
+│  Snowflake Intelligence (GA) + Cortex Agent                         │
+│  • Analyst (text-to-SQL) + Search (semantic) + ML Tools             │
+│  • AI SQL functions: AI_CLASSIFY, AI_REDACT, AI_TRANSCRIBE          │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 6: Governed AI                                                │
+│  Row Access Policies → Transparent security                         │
+│  • Same agent, different answers by role                            │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓
+                    ✅ INGESTION TO INTELLIGENCE COMPLETE
+                              ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│  BONUS: OPEN LAKEHOUSE (For architecture-focused audiences)         │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 7: Hybrid OLTP/OLAP                                           │
+│  Snowflake Postgres (managed) → MERGE sync → Cortex Search          │
+├─────────────────────────────────────────────────────────────────────┤
+│  DEMO 8: Iceberg Interoperability                                   │
+│  Snowflake → Iceberg on S3 → pg_lake (external Postgres)            │
+│  • Zero vendor lock-in: Any Iceberg reader works                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  📺 STREAMLIT DASHBOARD (Parallel - run alongside any demo)         │
+│  Real-time monitoring: ingestion metrics, pipeline health, ML       │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 Each demo builds on shared infrastructure and can be run sequentially or independently after one-time setup.
@@ -171,23 +181,37 @@ This truncates:
 
 Choose demos based on your audience:
 
-| Demo | Duration | Best For | Key Takeaway |
-|------|----------|----------|--------------|
-| **1. Snowpipe Streaming** | 10-15 min | Real-time Engineers | High-scale ingestion (Python or Java) |
-| **2. Gen2 Warehouse Performance** | 10-15 min | Data Engineers, Performance Teams | Next-gen MERGE/UPDATE operations |
-| **3. Dynamic Tables** | 15-20 min | Data Engineers, Architects | Zero-maintenance pipelines with incremental refresh |
-| **4. Interactive Tables** | 10-15 min | App Developers, Performance Engineers | Sub-100ms queries under high concurrency |
-| **5. DBT Analytics** | 10-15 min | Analytics Engineers | Batch analytical models with testing |
-| **6. ML Training** | 15-20 min | ML Engineers, Data Scientists | GPU-accelerated model training |
-| **7. Streamlit Dashboard** | Continuous | Everyone | Real-time pipeline monitoring |
-| **8. Snowflake Intelligence** | 10-15 min | Business Users, Analysts | Natural language queries via Cortex Agent |
-| **9. Security & Governance** | 10-15 min | Security Teams, Compliance | Transparent row-level security with AI |
-| **10. Snowflake Postgres** | 10-15 min | Data Engineers, Architects | Hybrid OLTP/OLAP with Cortex Search |
-| **Full Suite** | 90-120 min | Executive Demos, All-Hands | Complete end-to-end capabilities |
+| Act | Demo | Duration | Best For | Key Takeaway |
+|-----|------|----------|----------|--------------|
+| - | **Cortex Code (Opener)** | 5 min | Everyone | AI-assisted development |
+| 1 | **1. Real-Time Ingestion** | 10-15 min | Data Engineers | Linear horizontal scaling |
+| 1 | **2. Transformation Pipeline** | 20-25 min | Data Engineers, Architects | Gen2 + Dynamic Tables |
+| 2 | **3. High-Concurrency Serving** | 10-15 min | App Developers | Sub-100ms queries (GA) |
+| 2 | **4. Analytics & ML** | 20-25 min | Analytics/ML Engineers | dbt + GPU training |
+| 3 | **5. Conversational AI** | 10-15 min | Business Users, Analysts | Natural language queries |
+| 3 | **6. Governed AI** | 10-15 min | Security Teams | Row-level security with AI |
+| Bonus | **7. Hybrid OLTP/OLAP** | 10-15 min | Architects | Snowflake Postgres |
+| Bonus | **8. Iceberg Interop** | 10-15 min | Architects | Open lakehouse, no lock-in |
+| - | **Streamlit Dashboard** | Continuous | Everyone | Real-time monitoring |
+
+### Audience-Based Selections
+
+| Audience | Recommended | Duration |
+|----------|-------------|----------|
+| **Executives** | Acts 1-3 (Demos 1-6) | 60 min |
+| **Data Engineers** | Acts 1-2 (Demos 1-4) | 55 min |
+| **Business/Analysts** | Acts 2-3 (Demos 3-6) | 45 min |
+| **ML Engineers** | Act 2 (Demos 3-4) | 35 min |
+| **Architects** | Acts 1-3 + Bonus | 80 min |
+| **Full Suite** | Everything | 90 min |
 
 ---
 
-# DEMO 1: Snowpipe Streaming - High-Scale Ingestion
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 1: INGEST & STAGE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# DEMO 1: Real-Time Ingestion (Snowpipe Streaming)
 
 ## Overview
 Demonstrates high-performance real-time data ingestion using Snowpipe Streaming, capable of scaling to massive volumes through parallel processing. Available in both **Java** and **Python** implementations with identical functionality.
@@ -290,7 +314,11 @@ SELECT 'order_items', COUNT(*) FROM RAW.ORDER_ITEMS;
 
 ---
 
-# DEMO 2: Gen2 Warehouse Performance - Next-Generation MERGE/UPDATE Operations
+# DEMO 2: Transformation Pipeline (Gen2 + Dynamic Tables)
+
+This demo combines Gen2 Warehouse performance and Dynamic Tables into a unified transformation story.
+
+## Part A: Gen2 Warehouse Performance
 
 ## Overview
 Demonstrates performance improvements on MERGE/UPDATE/DELETE operations using Gen2 warehouses with a production-ready staging pattern.
@@ -391,6 +419,7 @@ LIMIT 10;
 
 **Performance:**
 - Gen2 uses `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'` for optimized DML
+- **Optima Indexing**: Gen2 warehouses automatically create and maintain indexes for point lookup queries at no additional cost
 - Performance characteristics vary by workload and data volume
 
 **Architecture Benefits:**
@@ -402,7 +431,7 @@ LIMIT 10;
 
 ---
 
-# DEMO 3: Dynamic Tables Pipeline
+## Part B: Dynamic Tables Pipeline
 
 ## Overview
 Showcases Snowflake Dynamic Tables with incremental refresh, automatic dependency management, and real-time data propagation through a 3-tier pipeline.
@@ -823,10 +852,16 @@ ORDER BY name, refresh_action;
 
 ---
 
-# DEMO 4: Interactive Tables & High-Concurrency Performance
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 2: SERVE & ANALYZE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# DEMO 3: High-Concurrency Serving (Interactive Tables)
 
 ## Overview
 Demonstrates Interactive Tables and Interactive Warehouses for customer-facing applications requiring consistent sub-100ms query latency under high concurrency (100+ concurrent users).
+
+**Status**: Generally Available (GA since December 11, 2025) - Available in select AWS regions.
 
 ## Quick Start
 
@@ -879,7 +914,11 @@ Rather than specific numbers, focus on demonstrating:
 
 ---
 
-# DEMO 5: DBT Analytics - Batch Analytical Models
+# DEMO 4: Analytics & ML (dbt + GPU Training)
+
+This demo combines batch analytical modeling with GPU-accelerated ML training.
+
+## Part A: dbt Analytics - Batch Analytical Models
 
 ## Overview
 Demonstrates batch-processed analytical models in Snowflake Workspaces complementing real-time Dynamic Tables. Creates customer lifetime value, segmentation, product affinity, and cohort retention analysis.
@@ -984,7 +1023,7 @@ LIMIT 6;
 
 ---
 
-# DEMO 6: ML Training - GPU-Accelerated Product Recommendations
+## Part B: ML Training - GPU-Accelerated Product Recommendations
 
 ## Overview
 Demonstrates GPU-accelerated ML model training in Snowflake Workspaces using XGBoost for product recommendations.
@@ -1096,92 +1135,15 @@ Agent Tool Definition:
 - Use Cases: Conversational product recommendations, targeted marketing campaigns
 ```
 
----
-
-# DEMO 7: Streamlit Dashboard - Real-Time Monitoring
-
-## Overview
-Demonstrates real-time pipeline monitoring, performance testing, and ML insights through an interactive Streamlit dashboard.
-
-## Quick Start
-
-```bash
-cd streamlit-dashboard
-
-# Local development
-pip install streamlit snowflake-snowpark-python pandas
-streamlit run streamlit_app.py --server.port 8501
-
-# Open browser
-http://localhost:8501
-```
-
-## Dashboard Features
-
-### 1. Data Pipeline Page
-- **Gen2 vs Gen1 Performance**: Run side-by-side MERGE operation benchmarks
-- **Snapshot/Restore**: Fair comparison mechanism for warehouse testing
-- **Real-time Results**: Query execution times and throughput metrics
-
-### 2. Live Ingestion Page
-- **Real-time Metrics**: Current order and order item counts
-- **Trend Analysis**: Growth over time with interactive charts
-- **Refresh Rate**: Auto-refresh every 30 seconds
-
-### 3. Pipeline Health Page
-- **Dynamic Tables Status**: Refresh history, lag metrics, scheduling state
-- **Data Freshness**: Latest data timestamps across all tables
-- **Health Checks**: Identify tables that need attention
-
-### 4. Query Performance Page
-- **On-Demand Testing**: Run concurrent queries against Interactive vs Standard warehouses
-- **Latency Distribution**: P50, P95, P99 latency charts
-- **Sample Queries**: Customer lookup, order lookup, aggregations
-
-### 5. ML Insights Page
-- **Model Metrics**: Precision, recall, F1-score from trained models
-- **Feature Importance**: Which features drive predictions
-- **Prediction Distribution**: Churn risk or recommendation scores
-
-## Key Demo Points
-
-**Talking points:**
-> "This Streamlit dashboard provides real-time visibility into our entire data pipeline:
->
-> **During Snowpipe Streaming demos:** Keep the Live Ingestion page open to show orders appearing in real-time
->
-> **During Gen2 demos:** Use the Data Pipeline page to run performance tests and show results side-by-side
->
-> **During Interactive Tables demos:** Use Query Performance page to test latency under different concurrency levels
->
-> **For business users:** ML Insights page shows model performance without requiring technical knowledge
->
-> This is a production-ready monitoring solution built entirely in Snowflake - no external monitoring tools needed."
-
-## Deploy to Snowflake
-
-```bash
-# Upload to stage
-snow stage copy streamlit_app.py @AUTOMATED_INTELLIGENCE.RAW.THE_DASHBOARD_STAGE \
-  --overwrite -c <your-connection-name>
-
-# Create app
-CREATE STREAMLIT AUTOMATED_INTELLIGENCE.RAW.PIPELINE_DASHBOARD
-  FROM '@AUTOMATED_INTELLIGENCE.RAW.THE_DASHBOARD_STAGE'
-  MAIN_FILE = 'streamlit_app.py';
-
-ALTER STREAMLIT AUTOMATED_INTELLIGENCE.RAW.PIPELINE_DASHBOARD 
-  SET QUERY_WAREHOUSE = AUTOMATED_INTELLIGENCE_WH;
-```
-
-**Closing:**
-> "Streamlit runs natively in Snowflake - no separate app servers, no deployment complexity. Just upload your code and it's live."
-
-**See:** `streamlit-dashboard/README.md` for detailed documentation
+**See:** `ml-training/README.md` for detailed setup, configuration, and troubleshooting
 
 ---
 
-# DEMO 8: Snowflake Intelligence - AI-Powered Conversational Analytics
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACT 3: INTELLIGENCE & GOVERNANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# DEMO 5: Conversational AI (Snowflake Intelligence)
 
 ## Overview
 Demonstrates natural language queries with Cortex Agent using semantic models for business terminology mapping and verified query repository (VQR) for accurate answers.
@@ -1339,7 +1301,7 @@ model, analyzing millions of customer-product interactions.
 
 ---
 
-# DEMO 9: Security & Governance - Row-Based Access Control
+# DEMO 6: Governed AI (Row-Based Access Control)
 
 ## Overview
 Demonstrates row-based access control (RBAC) using Snowflake Intelligence with region-filtered data views. Same agent, dramatically different answers based on role.
@@ -1407,7 +1369,11 @@ USE ROLE west_coast_manager;
 
 ---
 
-# DEMO 10: Snowflake Postgres - Hybrid OLTP/OLAP Architecture
+# ═══════════════════════════════════════════════════════════════════════════════
+# BONUS: OPEN LAKEHOUSE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# DEMO 7: Hybrid OLTP/OLAP (Snowflake Postgres)
 
 ## Overview
 Demonstrates a Hybrid OLTP/OLAP architecture where Postgres handles transactional writes (product reviews, support tickets) and Snowflake handles analytics with Cortex Search and natural language queries.
@@ -1539,12 +1505,17 @@ Navigate to **AI & ML > Snowflake Intelligence** and ask:
 
 **See:** `snowflake-postgres/README.md` for detailed setup and architecture
 
-### Step 5: pg_lake - Open Lakehouse (Optional Extension)
+---
+
+# DEMO 8: Iceberg Interoperability (pg_lake)
+
+## Overview
+Demonstrates true Open Lakehouse architecture where external systems query Snowflake data via Iceberg format - zero vendor lock-in.
 
 **What is pg_lake?**
 > An *external* PostgreSQL instance (not Snowflake Postgres) that reads Iceberg tables directly from S3. This demonstrates how ANY Iceberg-compatible system can access Snowflake data in open formats.
 
-**Setup (one-time):**
+## Setup (one-time)
 ```bash
 cd pg_lake
 
@@ -1619,20 +1590,92 @@ ORDER BY SCHEDULED_TIME DESC LIMIT 5;
 
 ---
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# PARALLEL / BOOKENDS
+# ═══════════════════════════════════════════════════════════════════════════════
 
+# OPENER: Cortex Code (AI-Assisted Development)
+
+**Duration:** 5 minutes | **When:** Start of any demo session
+
+**Purpose:** Show how AI accelerates development - "Let me show you how we built this"
+
+## Quick Demo
+
+```bash
+cortex -c <your-connection-name>
+```
+
+**Sample prompts:**
+```
+> Show me top 10 customers by total spend
+> Create a dbt model for customer churn risk
+> Explain what this query does: [paste SQL]
+```
+
+**What to say:**
+> "Before we dive into the data pipeline, let me show you how we built it. Cortex Code is Snowflake's AI-powered development assistant. I can ask it questions in plain English and it generates production-ready SQL, understands my schema, and even creates dbt models."
+
+---
+
+# PARALLEL: Streamlit Dashboard (Real-Time Monitoring)
+
+**Duration:** Continuous | **When:** Run alongside any demo
+
+## Overview
+Real-time pipeline monitoring, performance testing, and ML insights through an interactive Streamlit dashboard.
+
+## Quick Start
+
+```bash
+cd streamlit-dashboard
+pip install streamlit snowflake-snowpark-python pandas
+streamlit run streamlit_app.py --server.port 8501
+# Open http://localhost:8501
+```
+
+## Dashboard Pages
+
+| Page | Use During | What It Shows |
+|------|------------|---------------|
+| **Data Pipeline** | Demo 2 (Gen2) | MERGE performance comparison |
+| **Live Ingestion** | Demo 1 (Snowpipe) | Real-time order counts |
+| **Pipeline Health** | Demo 2 (Dynamic Tables) | Refresh status, lag metrics |
+| **Query Performance** | Demo 3 (Interactive) | Latency under concurrency |
+| **ML Insights** | Demo 4 (ML Training) | Model metrics, feature importance |
+
+**What to say:**
+> "Keep this dashboard open throughout the demo. It provides real-time visibility into our entire data pipeline - you'll see orders appearing as they stream in, transformation health, and query performance metrics."
+
+**See:** `streamlit-dashboard/README.md` for detailed documentation
+
+---
 
 ## 🔄 Running Demos Sequentially
 
-### Demo Order (Recommended)
-1. **Snowpipe Streaming** - Shows high-scale ingestion capability
-2. **Gen2 Warehouse Performance** - Shows next-gen MERGE/UPDATE performance from staged data
-3. **Dynamic Tables** - Shows foundational transformation pipeline
-4. **Interactive Tables** - Shows performance serving layer
-5. **DBT Analytics** - Shows batch analytical models (CLV, segmentation, cohorts)
-6. **ML Training** - Shows GPU-accelerated model training for product recommendations
-7. **Streamlit Dashboard** - Traditional BI/monitoring visualization
-8. **Snowflake Intelligence** - Natural language queries via Cortex Agent
-9. **Security & Governance** - Shows enterprise security with AI
+### Ingestion to Intelligence (Core Journey)
+
+**Act 1: Ingest & Stage**
+1. **Real-Time Ingestion** - Snowpipe Streaming (Python/Java)
+2. **Transformation Pipeline** - Gen2 + Dynamic Tables
+
+**Act 2: Serve & Analyze**
+3. **High-Concurrency Serving** - Interactive Tables (GA)
+4. **Analytics & ML** - dbt + GPU Training
+
+**Act 3: Intelligence & Governance**
+5. **Conversational AI** - Snowflake Intelligence
+6. **Governed AI** - Row-based access control
+
+✅ **Core journey complete at Demo 6**
+
+**Bonus: Open Lakehouse** (for architecture audiences)
+7. **Hybrid OLTP/OLAP** - Snowflake Postgres
+8. **Iceberg Interoperability** - pg_lake
+
+**Act 4: Open Lakehouse**
+7. **Hybrid OLTP/OLAP** - Snowflake Postgres
+8. **Iceberg Interoperability** - pg_lake (external Postgres)
 
 ### Notes for Sequential Execution
 - ✅ All demos share same base database (`AUTOMATED_INTELLIGENCE`)
@@ -1668,37 +1711,30 @@ ORDER BY table_name;
 
 ---
 
-## 🎯 Complete Demo Summary
+## 🎯 Ingestion to Intelligence: Complete
 
-After running all nine demos, you've demonstrated:
+After running demos 1-6, you've demonstrated the full journey:
 
-**Data Ingestion:**
-- ✅ Snowpipe Streaming: Sub-second latency, massive-scale ready, Python or Java
+**Act 1 - Ingest & Stage:**
+- ✅ Snowpipe Streaming: Sub-second latency, massive-scale ready
+- ✅ Gen2 Warehouses: Faster MERGE/UPDATE + Optima Indexing
+- ✅ Dynamic Tables: Incremental refresh, zero maintenance
 
-**Data Transformation:**
-- ✅ Gen2 Warehouses: Faster MERGE/UPDATE/DELETE operations
-- ✅ Dynamic Tables: Incremental refresh, automatic dependencies, zero maintenance
+**Act 2 - Serve & Analyze:**
+- ✅ Interactive Tables (GA): Sub-100ms queries, high concurrency
+- ✅ dbt Analytics: CLV, segmentation, product affinity
+- ✅ GPU Training: XGBoost recommendations, Model Registry
 
-**Data Serving:**
-- ✅ Interactive Tables: Sub-100ms queries, high concurrency, no external cache
+**Act 3 - Intelligence & Governance:**
+- ✅ Snowflake Intelligence (GA): Natural language queries
+- ✅ Row Access Policies: Transparent security with AI
 
-**Data Governance:**
-- ✅ Row Access Policies: Transparent security, role-based filtering, agent-compatible
+**Bonus - Open Lakehouse:**
+- ✅ Snowflake Postgres: Hybrid OLTP/OLAP
+- ✅ Iceberg: Zero vendor lock-in
 
-**ML & Analytics:**
-- ✅ GPU Workspaces: GPU-accelerated model training, Model Registry integration
-- ✅ DBT Analytics: Customer segmentation, product affinity, cohort analysis in Snowflake Workspaces
-
-**AI-Powered Analytics:**
-- ✅ Semantic Models: Business terminology mapping, verified queries, multi-source integration
-- ✅ Cortex Agent: Natural language queries, intelligent orchestration
-
-**Snowflake Capabilities Demonstrated:**
-- ✅ Fully native stack - no external systems required
-- ✅ Set-and-forget automation - minimal operational overhead
-- ✅ Linear scalability - from thousands to millions of records
-- ✅ Enterprise-grade security - built into Snowflake
-- ✅ Natural language interface - business users query data without SQL
+**The Punchline:**
+> *"From raw data streaming in, to business users asking questions in plain English—entirely within Snowflake. That's Ingestion to Intelligence."*
 
 ---
 

@@ -2,6 +2,8 @@
 
 This directory contains setup scripts for **Snowflake Intelligence** features: Cortex Analyst, Cortex Agent, and Cortex Search.
 
+**Status**: Generally Available (GA as of Build 2025)
+
 ## Prerequisites
 
 **Required:** Core setup must be completed first (includes semantic model stage creation)

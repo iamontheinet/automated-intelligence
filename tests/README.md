@@ -16,6 +16,13 @@ This directory contains test notebooks and SQL scripts for validating and learni
 - `SNOWFLAKE.CORTEX.AI_EXTRACT()` - Extract structured data from text
 - `CORTEX.SEARCH_PREVIEW()` - Product search demonstrations
 
+**Additional AI SQL functions available (Build 2025+):**
+- `AI_REDACT()` - Redact sensitive PII data from documents
+- `AI_TRANSCRIBE()` - Transcribe audio/video and translate between languages
+- `AI_CLASSIFY()` - Classify text or images into user-defined categories
+- `AI_EMBED()` - Generate embedding vectors for similarity search
+- `AI_SIMILARITY()` - Calculate embedding similarity between inputs
+
 ### Dynamic Tables Deep Dive
 - `test_dynamic_tables.ipynb` - Interactive tutorial on Dynamic Tables incremental refresh
 

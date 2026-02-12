@@ -1,13 +1,22 @@
 -- ============================================================================
--- Automated Intelligence - Complete Setup Script
+-- INGESTION TO INTELLIGENCE - Complete Setup Script
 -- 
+-- Theme: From raw data to AI-powered insights—entirely within Snowflake.
+--
+-- This script creates all infrastructure for the demo journey:
+--   Act 1: Ingest & Stage    → Streaming tables, staging, dynamic tables
+--   Act 2: Serve & Analyze   → Interactive tables, dbt schemas, ML models
+--   Act 3: Intelligence      → Cortex Search, semantic layer, AI functions
+--   Bonus: Open Lakehouse    → Iceberg export (separate script)
+--
 -- Execution Order:
 --   0. PREREQUISITES: Grant account-level privileges (ACCOUNTADMIN only)
 --   1. Clean up existing objects (WIPE SLATE)
---   2. Setup database, schemas, and warehouse
---   3. Create raw tables (customers, orders, order_items)
---   4. Create stored procedures for data generation
---   5. Create dynamic tables (3-tier pipeline)
+--   2. Create database, schemas, warehouses
+--   3. Create raw tables and stored procedures (Act 1)
+--   4. Create dynamic tables pipeline (Act 1)
+--   5. Create interactive tables (Act 2)
+--   6. Create AI/ML infrastructure (Act 3)
 --
 -- IMPORTANT: Run PREREQUISITES section first as ACCOUNTADMIN, then the rest
 -- ============================================================================
@@ -137,7 +146,8 @@ DROP SCHEMA IF EXISTS semantic CASCADE;
 DROP SCHEMA IF EXISTS raw CASCADE;
 
 -- ============================================================================
--- STEP 1: Setup Database, Schemas, and Warehouse
+-- STEP 1: Infrastructure Foundation
+-- Purpose: Database, schemas, and warehouses for all Acts
 -- ============================================================================
 
 -- Create database (already exists from step 0)
@@ -168,7 +178,8 @@ USE WAREHOUSE automated_intelligence_wh;
 
 
 -- ============================================================================
--- STEP 2: Create Raw Tables
+-- STEP 2: Raw Tables (Act 1 - Ingest & Stage)
+-- Purpose: Landing zone for Snowpipe Streaming data
 -- ============================================================================
 
 -- Create customers table
@@ -212,7 +223,8 @@ CREATE OR REPLACE TABLE order_items (
 );
 
 -- ============================================================================
--- STEP 3: Create Stored Procedures
+-- STEP 3: Stored Procedures (Act 1 - Ingest & Stage)
+-- Purpose: Data generation and staging operations
 -- ============================================================================
 
 -- Procedure: generate_customers
@@ -281,7 +293,8 @@ SHOW PROCEDURES LIKE '%generate%';
 
 
 -- ============================================================================
--- STEP 3.5: Create Staging Tables and Procedures
+-- STEP 3.5: Staging Layer + Gen2 Warehouse (Act 1 - Ingest & Stage)
+-- Purpose: Staging tables for MERGE operations, Gen2 for Optima Indexing
 -- ============================================================================
 
 USE SCHEMA automated_intelligence.staging;
@@ -557,7 +570,8 @@ $$;
 
 
 -- ============================================================================
--- STEP 4: Create Dynamic Tables (3-Tier Pipeline)
+-- STEP 4: Dynamic Tables Pipeline (Act 1 - Ingest & Stage)
+-- Purpose: 3-tier incremental refresh pipeline (Enrichment → Integration → Aggregation)
 -- ============================================================================
 
 USE SCHEMA automated_intelligence.dynamic_tables;
@@ -805,7 +819,8 @@ GROUP BY product_category;
 
 
 -- ============================================================================
--- STEP 4.5: Create Interactive Tables and Warehouse
+-- STEP 4.5: Interactive Tables (Act 2 - Serve & Analyze)
+-- Purpose: Sub-100ms queries for high-concurrency serving (GA Dec 2025)
 -- ============================================================================
 
 USE SCHEMA automated_intelligence.interactive;
@@ -853,7 +868,8 @@ ALTER WAREHOUSE automated_intelligence_interactive_wh RESUME;
 
 
 -- ============================================================================
--- STEP 5: Setup Data Quality Monitoring with DMFs
+-- STEP 5: Data Quality Monitoring (Act 3 - Intelligence & Governance)
+-- Purpose: DMFs for automated data quality checks and alerting
 -- ============================================================================
 
 -- Switch back to standard warehouse for DMF views (interactive warehouses can't query DMF results)
@@ -930,7 +946,8 @@ ALTER ALERT data_quality_alert RESUME;
 
 
 -- ============================================================================
--- STEP 6: Create Unstructured Data Tables for AI/SQL Functions
+-- STEP 6: AI/ML Infrastructure (Act 3 - Intelligence & Governance)
+-- Purpose: Tables for AI SQL functions, semantic search, and Cortex Agent
 -- ============================================================================
 
 USE SCHEMA automated_intelligence.raw;
@@ -1005,7 +1022,8 @@ WHEN NOT MATCHED THEN
 -- No static inserts needed here
 
 -- ============================================================================
--- STEP 7: Create Cortex Search Service for Product Catalog
+-- STEP 7: Cortex Search Service (Act 3 - Intelligence & Governance)
+-- Purpose: Semantic search over product catalog for Snowflake Intelligence
 -- ============================================================================
 
 -- Enable change tracking on product catalog for Cortex Search
@@ -1034,17 +1052,18 @@ SHOW CORTEX SEARCH SERVICES IN SCHEMA automated_intelligence.raw;
 
 
 -- ============================================================================
--- Setup Complete!
+-- Setup Complete! Infrastructure ready for Ingestion to Intelligence.
 -- 
 -- Next Steps:
---   1. Load initial data using generate_initial_data.sql
---   2. Run demos using dynamic_tables_demo.ipynb (recommended) or SQL scripts
---   3. See README.md for demo options and instructions
+--   1. Run Snowpipe Streaming to ingest data (Act 1)
+--   2. Follow DEMO_SCRIPT.md for the full journey
+--   3. See component READMEs for detailed instructions
 --
--- Data Quality Monitoring:
---   - DMFs monitor orders and order_items tables for NULL values
---   - Alert checks every 5 minutes and logs issues to data_quality_alerts table
---   - DMFs trigger automatically on INSERT, UPDATE, DELETE operations
+-- Demo Flow:
+--   Act 1: Ingest & Stage      → Demos 1-2 (Streaming, Gen2, Dynamic Tables)
+--   Act 2: Serve & Analyze     → Demos 3-4 (Interactive Tables, dbt, ML)
+--   Act 3: Intelligence        → Demos 5-6 (Snowflake Intelligence, RBAC)
+--   Bonus: Open Lakehouse      → Demos 7-8 (Postgres, Iceberg)
 -- ============================================================================
 
 TRUNCATE TABLE IF EXISTS automated_intelligence.raw.customers;
@@ -1117,26 +1136,26 @@ CALL automated_intelligence.raw.generate_customers($NUM_CUSTOMERS);
 -- Note: Use Snowpipe Streaming to generate orders (see snowpipe-streaming-java or snowpipe-streaming-python)
 
 -- ============================================================================
--- OPTIONAL SETUP SCRIPTS (Run Separately as Needed)
+-- OPTIONAL SETUP SCRIPTS (Per-Act Configuration)
 -- ============================================================================
--- The following setup files are available for optional features:
+-- Run these scripts based on which Acts you're demonstrating:
 --
--- 1. SNOWPIPE STREAMING (High-Performance Ingestion)
---    - snowpipe-streaming-java/setup_pipes.sql
---    - snowpipe-streaming-python/recreate_pipes.sql
---    Purpose: Set up Snowpipe Streaming for real-time data ingestion
---    Use when: You need high-throughput streaming data ingestion
+-- ACT 1: INGEST & STAGE
+--   - snowpipe-streaming-java/setup_pipes.sql (Java SDK)
+--   - snowpipe-streaming-python/recreate_pipes.sql (Python SDK)
 --
--- 2. SECURITY & GOVERNANCE (Row-Level Security Demo)
---    - security-and-governance/setup_west_coast_manager.sql
---    Purpose: Create demo role with row-level security policies
---    Use when: You want to demonstrate region-based access control
+-- ACT 2: SERVE & ANALYZE
+--   - dbt-analytics/dbt_project.yml (dbt models)
+--   - ml-training/ notebooks (GPU training)
 --
--- 3. PG_LAKE (Open Lakehouse - Query Snowflake Data from Postgres)
---    - pg_lake/snowflake_export.sql
---    Purpose: Create Iceberg tables that pg_lake (Postgres) can query via S3
---    Requires: External volume 'aws_s3_ext_volume_snowflake' configured
---    Use when: Demonstrating Snowflake's open data formats and interoperability
+-- ACT 3: INTELLIGENCE & GOVERNANCE
+--   - security-and-governance/setup_west_coast_manager.sql (Row Access Policies)
+--   - snowflake-intelligence/ (Cortex Agent configuration)
 --
--- Run these scripts individually based on your specific requirements
+-- BONUS: OPEN LAKEHOUSE
+--   - pg_lake/snowflake_export.sql (Iceberg export to S3)
+--   - snowflake-postgres/ (Managed Postgres setup)
+--   Requires: External volume 'aws_s3_ext_volume_snowflake' configured
+--
+-- See DEMO_SCRIPT.md for the complete Ingestion to Intelligence journey.
 -- ============================================================================

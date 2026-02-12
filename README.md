@@ -180,7 +180,7 @@ Before starting, ensure you have:
 
 ### 4. Regional Feature Availability
 Verify these features are available in your Snowflake region:
-- **Interactive Warehouses**: Limited AWS regions (preview)
+- **Interactive Warehouses**: Generally Available (select AWS regions)
 - **Gen2 Warehouses**: [Check availability](https://docs.snowflake.com/en/user-guide/warehouses-gen2#region-availability)
 - **Container Runtime** (for Ray): Required for ML training notebooks
 
@@ -1119,10 +1119,10 @@ Solution: Verify staging tables exist
 
 **Issue: Interactive warehouse creation fails**
 ```
-Solution: Check preview availability
-- Interactive warehouses are in preview (select AWS regions only)
-- Not available in all accounts/regions
-- Skip this demo if not available
+Solution: Check region availability
+- Interactive warehouses are GA in select AWS regions only
+- Check https://docs.snowflake.com/en/user-guide/interactive.html#label-interactive-region-availability
+- Skip this demo if not available in your region
 ```
 
 **Issue: Queries timeout at 5 seconds**
@@ -1490,7 +1490,7 @@ done
 
 - ⚠️ **5-second query timeout** (cannot be increased)
 - ⚠️ **Always-on billing** (no auto-suspend by design)
-- ⚠️ **Preview feature** (select AWS regions only)
+- ✅ **Generally Available** (GA since Dec 2025, select AWS regions)
 
 ### Snowpipe Streaming
 
