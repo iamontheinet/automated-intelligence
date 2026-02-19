@@ -623,6 +623,36 @@ CALL AUTOMATED_INTELLIGENCE.MODELS.GET_PRODUCT_RECOMMENDATIONS(2, 3, 'LOW_ENGAGE
 
 ---
 
+### SQL Features & Reference Demos
+
+Located in the `sql-features/`, `ai-sql-demo/`, `gen2-warehouse/`, `data-quality/`, `iceberg/`, `snowflake-intelligence/`, `ml-models/`, and `monitoring/` directories, these demos showcase the latest Snowflake SQL capabilities:
+
+| Demo File | Feature | Description |
+|-----------|---------|-------------|
+| `ai-sql-demo/ai_filter_demo.sql` | AI SQL Functions | AI_FILTER and AI_CLASSIFY for intelligent data filtering |
+| `snowflake-intelligence/semantic_view_sql_demo.sql` | Semantic Views | SQL-based semantic view creation (TABLES → RELATIONSHIPS → FACTS → DIMENSIONS → METRICS) |
+| `gen2-warehouse/optima_indexing_demo.sql` | Optima Indexing | Automatic index creation for Gen2 warehouses |
+| `sql-features/pipe_operator_demo.sql` | Pipe Operator (`->>`) | Functional SQL chaining with `$1` reference |
+| `sql-features/union_by_name_demo.sql` | UNION BY NAME | Column name-based union (schema evolution friendly) |
+| `sql-features/time_series_gap_filling_demo.sql` | Time Series Gap-Filling | RESAMPLE clause with INTERPOLATE_FFILL/BFILL/LINEAR |
+| `sql-features/async_sql_demo.sql` | ASYNC SQL | Parallel query execution with `ASYNC()` and `AWAIT ALL` |
+| `data-quality/data_quality_expectations_demo.sql` | Data Quality Expectations | Data Metric Functions for monitoring |
+| `iceberg/partitioned_writes_demo.sql` | Iceberg Partitioned Writes | CREATE ICEBERG TABLE with partition expressions |
+| `snowflake-intelligence/cortex_analyst_routing_demo.sql` | Cortex Analyst Routing | Multi-semantic-model routing mode |
+| `ml-models/huggingface_import_demo.sql` | HuggingFace Import | Import pre-trained models from HuggingFace Hub |
+| `sql-features/create_or_alter_demo.sql` | CREATE OR ALTER DDL | Idempotent object management |
+| `monitoring/performance_explorer_reference.sql` | Performance Explorer | Query performance analysis reference |
+
+**Quick Start:**
+```bash
+# Run any demo file
+snow sql -f sql-features/pipe_operator_demo.sql -c <your-connection-name>
+
+# Or view in Snowsight worksheets
+```
+
+---
+
 ### DEMO 7: Streamlit Dashboard - Real-Time Monitoring
 
 **What it demonstrates:**
@@ -1283,16 +1313,41 @@ automated-intelligence/
 │   │       └── cohort/         # Retention analysis
 │   └── README.md               # DBT setup and usage guide
 │
-├── snowflake-intelligence/     # Demo 2: Cortex AI & Analyst (component-specific setup)
+├── snowflake-intelligence/     # Cortex AI & Analyst (component-specific setup)
 │   ├── business_insights_semantic_model.yaml  # Semantic model definition
+│   ├── semantic_view_sql_demo.sql             # SQL-based semantic view creation demo
+│   ├── cortex_analyst_routing_demo.sql        # Cortex Analyst routing mode demo
 │   ├── create_semantic_model_stage.sql        # Stage for semantic model YAML
 │   ├── create_agent.sql                       # Cortex Agent for NL queries
 │   └── create_cortex_search.sql               # Cortex Search for product discovery
 │
-├── gen2-warehouse/             # Demo 1: Gen2 Warehouse (component-specific setup)
+├── gen2-warehouse/             # Gen2 Warehouse (component-specific setup)
 │   ├── setup_staging_pipeline.sql    # Staging schema, tables, Gen2 WH
 │   ├── setup_merge_procedures.sql    # MERGE/UPDATE procedures with benchmarking
+│   ├── optima_indexing_demo.sql      # Optima automatic indexing demo
 │   └── README.md               # Gen2 setup and demo instructions
+│
+├── sql-features/               # SQL Feature Demos (latest Snowflake capabilities)
+│   ├── pipe_operator_demo.sql        # Pipe operator (->> with $1) demo
+│   ├── union_by_name_demo.sql        # UNION BY NAME demo
+│   ├── time_series_gap_filling_demo.sql  # RESAMPLE/interpolation demo
+│   ├── async_sql_demo.sql            # ASYNC/AWAIT SQL demo
+│   └── create_or_alter_demo.sql      # CREATE OR ALTER DDL demo
+│
+├── ai-sql-demo/                # AI SQL Functions
+│   └── ai_filter_demo.sql            # AI_FILTER and AI_CLASSIFY demo
+│
+├── data-quality/               # Data Quality Features
+│   └── data_quality_expectations_demo.sql  # Data Metric Functions demo
+│
+├── iceberg/                    # Iceberg Table Features
+│   └── partitioned_writes_demo.sql   # Iceberg partitioned writes demo
+│
+├── ml-models/                  # ML Model Features
+│   └── huggingface_import_demo.sql   # HuggingFace model import demo
+│
+├── monitoring/                 # Observability & Performance
+│   └── performance_explorer_reference.sql  # Performance Explorer reference
 │
 ├── interactive/                # Demo 3: Interactive Tables (component-specific setup)
 │   ├── setup_interactive.sql   # Interactive tables and warehouse

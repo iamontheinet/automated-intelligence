@@ -192,6 +192,7 @@ Choose demos based on your audience:
 | 3 | **6. Governed AI** | 10-15 min | Security Teams | Row-level security with AI |
 | Bonus | **7. Hybrid OLTP/OLAP** | 10-15 min | Architects | Snowflake Postgres |
 | Bonus | **8. Iceberg Interop** | 10-15 min | Architects | Open lakehouse, no lock-in |
+| - | **SQL Features** | 5-10 min each | Data Engineers, DBAs | Latest SQL capabilities |
 | - | **Streamlit Dashboard** | Continuous | Everyone | Real-time monitoring |
 
 ### Audience-Based Selections
@@ -1651,6 +1652,144 @@ streamlit run streamlit_app.py --server.port 8501
 
 ---
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# SQL FEATURES & REFERENCE DEMOS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Additional SQL Feature Demos
+
+These standalone SQL demos showcase the latest Snowflake SQL capabilities. Each demo is self-contained and can be run independently.
+
+## Overview
+
+| Demo | Feature | Key Syntax | Use Case |
+|------|---------|------------|----------|
+| **AI SQL Functions** | AI_FILTER, AI_CLASSIFY | `AI_FILTER(col, 'urgent')` | Intelligent data filtering without ML |
+| **Semantic Views (SQL)** | SQL-based semantic views | `CREATE SEMANTIC VIEW ... TABLES ... FACTS ... DIMENSIONS` | Text-to-SQL with business terminology |
+| **Optima Indexing** | Gen2 automatic indexing | `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'` | Point lookup optimization |
+| **Pipe Operator** | Functional SQL chaining | `source ->> transform1 ->> transform2` | Readable data pipelines |
+| **UNION BY NAME** | Schema-evolution-friendly unions | `SELECT ... UNION BY NAME SELECT ...` | Flexible data integration |
+| **Time Series Gap-Filling** | RESAMPLE interpolation | `RESAMPLE ... INTERPOLATE_LINEAR()` | IoT/sensor data analysis |
+| **ASYNC SQL** | Parallel query execution | `ASYNC (query)` + `AWAIT ALL` | Concurrent ETL operations |
+| **Data Quality Expectations** | Data Metric Functions | `CREATE DATA METRIC FUNCTION` | Data quality monitoring |
+| **Iceberg Partitioned Writes** | Native Iceberg support | `CREATE ICEBERG TABLE ... PARTITION BY` | Open lakehouse |
+| **Cortex Analyst Routing** | Multi-model routing | `routing_mode => 'routing'` | Multi-domain analytics |
+| **HuggingFace Import** | ML model import | `CREATE MODEL ... FROM HUGGINGFACE` | Pre-trained model deployment |
+| **CREATE OR ALTER** | Idempotent DDL | `CREATE OR ALTER TABLE` | CI/CD-friendly migrations |
+| **Performance Explorer** | Query analysis | Account Usage views | Performance optimization |
+
+## File Locations
+
+```
+sql-features/
+├── pipe_operator_demo.sql           # ->> operator with $1 reference
+├── union_by_name_demo.sql           # UNION BY NAME
+├── time_series_gap_filling_demo.sql # RESAMPLE and interpolation
+├── async_sql_demo.sql               # ASYNC/AWAIT patterns
+└── create_or_alter_demo.sql         # Idempotent DDL
+
+ai-sql-demo/
+└── ai_filter_demo.sql               # AI_FILTER and AI_CLASSIFY
+
+data-quality/
+└── data_quality_expectations_demo.sql   # Data Metric Functions
+
+iceberg/
+└── partitioned_writes_demo.sql      # Iceberg partitioning
+
+snowflake-intelligence/
+├── semantic_view_sql_demo.sql       # SQL-based semantic views
+└── cortex_analyst_routing_demo.sql  # Multi-semantic-model routing
+
+ml-models/
+└── huggingface_import_demo.sql      # HuggingFace model import
+
+gen2-warehouse/
+└── optima_indexing_demo.sql         # Automatic indexing
+
+monitoring/
+└── performance_explorer_reference.sql   # Query performance analysis
+```
+
+## Running the Demos
+
+```bash
+# Run any demo file
+snow sql -f sql-features/pipe_operator_demo.sql -c <your-connection-name>
+
+# Or copy contents to Snowsight worksheet
+```
+
+## Demo Highlights
+
+### AI SQL Functions
+```sql
+-- Filter reviews intelligently without ML training
+SELECT * FROM product_reviews
+WHERE AI_FILTER(review_text, 'customer is frustrated or disappointed');
+
+-- Classify data into categories
+SELECT product_name, AI_CLASSIFY(description, ARRAY['budget', 'premium', 'professional']) AS segment
+FROM products;
+```
+
+### Pipe Operator (`->>`)
+```sql
+-- Chain transformations functionally (uses $1 to reference previous result)
+SELECT * FROM orders
+  ->> WHERE $1.status = 'completed'
+  ->> SELECT $1.customer_id, SUM($1.amount) AS total GROUP BY $1.customer_id
+  ->> WHERE $1.total > 1000;
+```
+
+### Time Series Gap-Filling
+```sql
+-- Fill missing sensor readings with interpolation
+SELECT * FROM sensor_data
+  RESAMPLE (timestamp BY INTERVAL '1 hour')
+    INTERPOLATE_LINEAR(temperature)
+    INTERPOLATE_FFILL(status);
+```
+
+### ASYNC SQL (in stored procedures)
+```sql
+-- Run queries in parallel within stored procedures
+LET q1 := ASYNC (SELECT COUNT(*) FROM orders);
+LET q2 := ASYNC (SELECT COUNT(*) FROM customers);
+LET q3 := ASYNC (SELECT COUNT(*) FROM products);
+AWAIT ALL;  -- Wait for all to complete
+```
+
+### Semantic Views (SQL-based)
+```sql
+-- Create semantic view with proper clause order
+CREATE SEMANTIC VIEW orders_analytics
+  TABLES (orders, customers, products)
+  RELATIONSHIPS (orders(customer_id) -> customers(customer_id))
+  FACTS (orders: total_amount, quantity)
+  DIMENSIONS (customers: segment, region; products: category)
+  METRICS (revenue = SUM(total_amount));
+```
+
+## When to Use These Features
+
+| Feature | Best For |
+|---------|----------|
+| AI SQL Functions | Ad-hoc filtering without training models |
+| Semantic Views | Self-service analytics with business terms |
+| Pipe Operator | Complex ETL with readable code |
+| UNION BY NAME | Schema evolution, data lake integration |
+| Time Series Gap-Filling | IoT, sensor data, time series analysis |
+| ASYNC SQL | Parallel ETL, concurrent data processing |
+| Data Quality | Monitoring data pipelines, SLAs |
+| Iceberg Partitioning | Open lakehouse, external query engines |
+| HuggingFace Import | NLP, computer vision, embeddings |
+| CREATE OR ALTER | DevOps, CI/CD, infrastructure-as-code |
+
+**See:** Individual demo files for complete examples with setup, execution, and cleanup.
+
+---
+
 ## 🔄 Running Demos Sequentially
 
 ### Ingestion to Intelligence (Core Journey)
@@ -1786,6 +1925,19 @@ Or keep the structure and just add more data:
 - **Streamlit Dashboard**: `streamlit-dashboard/README.md` - Deployment and features
 - **Snowflake Intelligence**: `snowflake-intelligence/README.md` - Cortex Agent setup
 - **RBAC Demo**: `security-and-governance/README.md`
+
+### SQL Features & Reference Demos
+- **AI SQL Functions**: `ai-sql-demo/ai_filter_demo.sql` - AI_FILTER, AI_CLASSIFY
+- **Semantic Views**: `snowflake-intelligence/semantic_view_sql_demo.sql` - SQL-based creation
+- **Pipe Operator**: `sql-features/pipe_operator_demo.sql` - `->>` chaining
+- **UNION BY NAME**: `sql-features/union_by_name_demo.sql` - Schema evolution
+- **Time Series**: `sql-features/time_series_gap_filling_demo.sql` - RESAMPLE, interpolation
+- **ASYNC SQL**: `sql-features/async_sql_demo.sql` - Parallel query execution
+- **Data Quality**: `data-quality/data_quality_expectations_demo.sql` - Metric functions
+- **Iceberg**: `iceberg/partitioned_writes_demo.sql` - Partitioned tables
+- **HuggingFace**: `ml-models/huggingface_import_demo.sql` - Model import
+- **CREATE OR ALTER**: `sql-features/create_or_alter_demo.sql` - Idempotent DDL
+- **Performance**: `monitoring/performance_explorer_reference.sql` - Query analysis
 
 ### Query Scripts
 - **Dynamic Tables**: SQL scripts in `setup/` directory

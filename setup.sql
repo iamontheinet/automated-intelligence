@@ -6,7 +6,7 @@
 -- This script creates all infrastructure for the demo journey:
 --   Act 1: Ingest & Stage    → Streaming tables, staging, dynamic tables
 --   Act 2: Serve & Analyze   → Interactive tables, dbt schemas, ML models
---   Act 3: Intelligence      → Cortex Search, semantic layer, AI functions
+--   Act 3: Intelligence      → Cortex Search, semantic views, AI functions
 --   Bonus: Open Lakehouse    → Iceberg export (separate script)
 --
 -- Execution Order:
@@ -17,6 +17,8 @@
 --   4. Create dynamic tables pipeline (Act 1)
 --   5. Create interactive tables (Act 2)
 --   6. Create AI/ML infrastructure (Act 3)
+--   7. Create Cortex Search Service (Act 3)
+--   8. Create Semantic View (Act 3)
 --
 -- IMPORTANT: Run PREREQUISITES section first as ACCOUNTADMIN, then the rest
 -- ============================================================================
@@ -1052,18 +1054,140 @@ SHOW CORTEX SEARCH SERVICES IN SCHEMA automated_intelligence.raw;
 
 
 -- ============================================================================
+-- STEP 8: Semantic View (Act 3 - Intelligence & Governance)
+-- Purpose: SQL-based semantic layer for Cortex Analyst natural language queries
+-- ============================================================================
+
+USE SCHEMA automated_intelligence.semantic;
+
+-- Create Semantic View for business analytics
+-- Note: Semantic Views use SQL syntax (not YAML) and enable natural language queries
+-- Clause order MUST be: TABLES → RELATIONSHIPS → FACTS → DIMENSIONS → METRICS
+CREATE OR REPLACE SEMANTIC VIEW business_analytics_semantic
+TABLES (
+    orders AS automated_intelligence.raw.orders
+        PRIMARY KEY (order_id)
+        WITH SYNONYMS = ('sales', 'transactions', 'purchases')
+        COMMENT = 'Customer orders with amounts and status',
+    
+    customers AS automated_intelligence.raw.customers
+        PRIMARY KEY (customer_id)
+        WITH SYNONYMS = ('buyers', 'clients', 'users')
+        COMMENT = 'Customer master data with segments',
+    
+    items AS automated_intelligence.raw.order_items
+        PRIMARY KEY (order_item_id)
+        WITH SYNONYMS = ('line_items', 'order_details', 'products_ordered')
+        COMMENT = 'Individual items within each order'
+)
+RELATIONSHIPS (
+    orders (customer_id) REFERENCES customers,
+    items (order_id) REFERENCES orders
+)
+FACTS (
+    orders.total_amount AS total_amount
+        WITH SYNONYMS = ('order_value', 'sale_amount', 'revenue')
+        COMMENT = 'Total monetary value of the order',
+    
+    items.quantity AS quantity
+        WITH SYNONYMS = ('qty', 'units', 'count')
+        COMMENT = 'Number of units ordered',
+    
+    items.unit_price AS unit_price
+        WITH SYNONYMS = ('price', 'cost', 'item_price')
+        COMMENT = 'Price per unit'
+)
+DIMENSIONS (
+    orders.order_status AS order_status
+        WITH SYNONYMS = ('status', 'state')
+        COMMENT = 'Current status of the order',
+    
+    orders.order_date AS order_date
+        WITH SYNONYMS = ('date', 'purchase_date', 'transaction_date')
+        COMMENT = 'Date when order was placed',
+    
+    customers.customer_segment AS customer_segment
+        WITH SYNONYMS = ('segment', 'tier', 'category')
+        COMMENT = 'Customer classification tier',
+    
+    customers.first_name AS first_name
+        COMMENT = 'Customer first name',
+    
+    customers.last_name AS last_name
+        COMMENT = 'Customer last name'
+)
+METRICS (
+    orders.total_revenue AS SUM(total_amount)
+        WITH SYNONYMS = ('revenue', 'sales', 'total_sales')
+        COMMENT = 'Sum of all order amounts',
+    
+    orders.order_count AS COUNT(DISTINCT orders.order_id)
+        WITH SYNONYMS = ('number_of_orders', 'total_orders')
+        COMMENT = 'Count of unique orders',
+    
+    customers.customer_count AS COUNT(DISTINCT customers.customer_id)
+        WITH SYNONYMS = ('number_of_customers', 'total_customers')
+        COMMENT = 'Count of unique customers',
+    
+    orders.average_order_value AS AVG(total_amount)
+        WITH SYNONYMS = ('aov', 'avg_order', 'mean_order_value')
+        COMMENT = 'Average monetary value per order'
+)
+COMMENT = 'Semantic layer for natural language business analytics queries';
+
+-- Verify Semantic View creation
+SHOW SEMANTIC VIEWS IN SCHEMA automated_intelligence.semantic;
+DESCRIBE SEMANTIC VIEW business_analytics_semantic;
+
+
+-- ============================================================================
+-- STEP 9: SQL Features Reference (Standalone Demo Scripts)
+-- Purpose: Reference to advanced SQL feature demonstrations
+-- ============================================================================
+-- The following SQL features have dedicated demo scripts in the repository.
+-- These demonstrate cutting-edge Snowflake capabilities with working examples.
+--
+-- AI SQL Functions:
+--   - sql-features/ai-sql-demo/ai_filter_demo.sql (AI_FILTER, AI_CLASSIFY)
+--
+-- New SQL Syntax (2024-2025):
+--   - sql-features/pipe_operator_demo.sql (Pipe operator ->> with $1)
+--   - sql-features/union_by_name_demo.sql (UNION BY NAME for schema evolution)
+--   - sql-features/time_series_gap_fill_demo.sql (RESAMPLE clause)
+--   - sql-features/async_sql_demo.sql (ASYNC procedures)
+--   - sql-features/create_or_alter_demo.sql (CREATE OR ALTER DDL)
+--
+-- Semantic Views:
+--   - snowflake-intelligence/semantic_view_sql_demo.sql (Full SQL syntax demo)
+--
+-- Infrastructure Features:
+--   - sql-features/gen2-warehouse/gen2_optima_demo.sql (Gen2 + Optima Indexing)
+--   - sql-features/data-quality/dmf_expectations_demo.sql (Data Metric Functions)
+--   - sql-features/iceberg/iceberg_partitioning_demo.sql (Iceberg tables)
+--
+-- ML & AI:
+--   - sql-features/ml-models/huggingface_import_demo.sql (HuggingFace models)
+--   - snowflake-intelligence/cortex_analyst_routing_demo.sql (Multi-agent routing)
+--
+-- See DEMO_SCRIPT.md "SQL FEATURES & REFERENCE DEMOS" section for full details.
+-- ============================================================================
+
+
+-- ============================================================================
 -- Setup Complete! Infrastructure ready for Ingestion to Intelligence.
 -- 
 -- Next Steps:
 --   1. Run Snowpipe Streaming to ingest data (Act 1)
 --   2. Follow DEMO_SCRIPT.md for the full journey
 --   3. See component READMEs for detailed instructions
+--   4. Explore SQL Features demos in sql-features/ directory
 --
 -- Demo Flow:
 --   Act 1: Ingest & Stage      → Demos 1-2 (Streaming, Gen2, Dynamic Tables)
 --   Act 2: Serve & Analyze     → Demos 3-4 (Interactive Tables, dbt, ML)
 --   Act 3: Intelligence        → Demos 5-6 (Snowflake Intelligence, RBAC)
 --   Bonus: Open Lakehouse      → Demos 7-8 (Postgres, Iceberg)
+--   SQL Features Reference     → 13 standalone demos (AI SQL, Pipe Operator, etc.)
 -- ============================================================================
 
 TRUNCATE TABLE IF EXISTS automated_intelligence.raw.customers;
