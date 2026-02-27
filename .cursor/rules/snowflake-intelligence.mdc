@@ -1,0 +1,121 @@
+---
+description: Snowflake Intelligence (Cortex Agent) configuration, semantic models, and search services
+globs: snowflake-intelligence/**
+alwaysApply: false
+---
+
+# Snowflake Intelligence
+
+This component configures the Cortex Agent and supporting services (Cortex Analyst + Cortex Search) that power the natural-language query interface.
+
+## Architecture
+
+```
+User Question (natural language)
+        │
+        ▼
+ORDER_ANALYTICS_AGENT (SEMANTIC schema)
+        │
+        └── Cortex Analyst ──→ YAML Semantic Model on stage
+                                (business_insights_semantic_model.yaml)
+
+Cortex Search (independent, not wired into agent)
+  ├── PRODUCT_REVIEWS_SEARCH (SEMANTIC schema)
+  ├── SUPPORT_TICKETS_SEARCH (SEMANTIC schema)
+  └── product_search_service (RAW schema)
+```
+
+## Cortex Agent
+
+The agent `ORDER_ANALYTICS_AGENT` uses a **YAML semantic model on a stage** (not a SQL semantic view):
+
+```sql
+CREATE OR REPLACE CORTEX AGENT AUTOMATED_INTELLIGENCE.SEMANTIC.ORDER_ANALYTICS_AGENT
+  SEMANTIC_MODEL = '@AUTOMATED_INTELLIGENCE.RAW.SEMANTIC_MODELS/business_insights_semantic_model.yaml';
+```
+
+**Important**: The agent definition has:
+- **No `SEARCH_SERVICES` clause** — the search services exist independently but are not wired into the agent
+- **No `SEMANTIC_VIEWS` clause** — uses YAML-on-stage `SEMANTIC_MODEL`, not SQL semantic views
+- **No `TOOLS` clause** — no stored procedures are connected as agent tools
+
+The agent creation is documented in `README.md` but the actual `create_agent.sql` file does **not exist** — you must run the CREATE statement manually.
+
+### YAML Semantic Model vs Semantic Views
+
+This project uses the **legacy YAML-on-stage approach** (`business_insights_semantic_model.yaml`). Snowflake now recommends **SQL Semantic Views** (GA 2025) as the preferred approach. Two semantic views do exist in the project but are separate demos:
+
+| Name | Location | Tables |
+|------|----------|--------|
+| `business_analytics_semantic` | `setup.sql:1066` | `RAW.ORDERS`, `RAW.CUSTOMERS`, `RAW.ORDER_ITEMS` |
+| `ORDERS_ANALYTICS_SV` | `semantic_view_sql_demo.sql:22` | `RAW.ORDERS`, `RAW.CUSTOMERS` |
+
+Neither is referenced by the agent.
+
+## Cortex Search Services
+
+Three search services exist (not two):
+
+| Service | Schema | Source Table | TARGET_LAG |
+|---------|--------|-------------|------------|
+| `product_search_service` | RAW | `RAW.PRODUCT_CATALOG` | `1 hour` |
+| `product_reviews_search` | SEMANTIC | `RAW.PRODUCT_REVIEWS` | `1 hour` |
+| `support_tickets_search` | SEMANTIC | `RAW.SUPPORT_TICKETS` | `1 hour` |
+
+```sql
+-- From create_postgres_search_services.sql
+CREATE OR REPLACE CORTEX SEARCH SERVICE SEMANTIC.PRODUCT_REVIEWS_SEARCH
+  ON review_text
+  WAREHOUSE = AUTOMATED_INTELLIGENCE_WH
+  TARGET_LAG = '1 hour'
+AS (
+  SELECT review_text, product_name, rating, review_date
+  FROM RAW.PRODUCT_REVIEWS
+);
+```
+
+**Note**: All search services query `RAW.*` tables (not `POSTGRES.*`). TARGET_LAG is `1 hour` (not `5 minutes`).
+
+## Directory Contents
+
+| File | Purpose |
+|------|---------|
+| `business_insights_semantic_model.yaml` | YAML semantic model for Cortex Analyst |
+| `cortex_analyst_routing_demo.sql` | Demo queries using Cortex Analyst |
+| `create_postgres_search_services.sql` | Creates 2 search services (reviews + tickets) |
+| `semantic_view_sql_demo.sql` | Standalone semantic view demo |
+| `README.md` | Documentation |
+
+## Known Issues
+
+1. **`create_agent.sql` does not exist** — referenced in README but missing; agent must be created manually
+2. **`create_cortex_search.sql` does not exist** — README references it but actual file is `create_postgres_search_services.sql`
+3. **Search services not in agent** — PRODUCT_REVIEWS_SEARCH and SUPPORT_TICKETS_SEARCH exist but are not wired into the agent via SEARCH_SERVICES clause
+4. **YAML vs semantic views** — agent uses legacy YAML approach; consider migrating to semantic views
+
+## Cortex Agent Best Practices (2025 Docs)
+
+- **Prefer Semantic Views** over YAML-on-stage for new projects
+- **Synonyms matter** — add business terms for better NL understanding
+- **Test with edge cases** — ambiguous questions, misspellings, multi-hop queries
+- **Wire search services into agent** — combine structured + unstructured for best results
+
+## Running
+
+```sql
+-- Test the agent directly
+SELECT SNOWFLAKE.CORTEX.AGENT(
+  'AUTOMATED_INTELLIGENCE.SEMANTIC.ORDER_ANALYTICS_AGENT',
+  'What are the top 5 customers by revenue this month?'
+);
+
+-- Test Cortex Search independently
+SELECT *
+FROM TABLE(
+  SNOWFLAKE.CORTEX.SEARCH(
+    'AUTOMATED_INTELLIGENCE.SEMANTIC.PRODUCT_REVIEWS_SEARCH',
+    'ski boot comfort issues',
+    5
+  )
+);
+```

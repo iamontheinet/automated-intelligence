@@ -34,28 +34,32 @@ Snowflake Intelligence (Cortex Agent)
 
 ```
 AUTOMATED_INTELLIGENCE (Database)
-├── RAW                 # Source tables: customers, orders, order_items, product_catalog, product_reviews, support_tickets
-├── STAGING             # Gen2 pipeline: orders_staging, order_items_staging, customers_staging
-├── DYNAMIC_TABLES      # Transformations: enriched_orders, fact_orders, daily_business_metrics, product_performance_metrics
+├── RAW                 # Source tables: customers, orders, order_items, product_catalog, product_reviews, support_tickets, data_quality_alerts
+├── STAGING             # Gen2 pipeline: orders_staging, order_items_staging, discount_snapshot
+├── DYNAMIC_TABLES      # Transformations: enriched_orders, enriched_order_items, fact_orders, daily_business_metrics, product_performance_metrics
 ├── INTERACTIVE         # Serving: customer_order_analytics (by customer_id), order_lookup (by order_id)
-├── SEMANTIC            # AI: ORDER_ANALYTICS_AGENT, PRODUCT_REVIEWS_SEARCH, SUPPORT_TICKETS_SEARCH
+├── SEMANTIC            # AI: business_analytics_semantic (semantic view, created in setup.sql); ORDER_ANALYTICS_AGENT, PRODUCT_REVIEWS_SEARCH, SUPPORT_TICKETS_SEARCH (created separately)
 ├── MODELS              # ML: Trained models, GET_PRODUCT_RECOMMENDATIONS stored procedure
-├── DBT_STAGING         # dbt staging views
+├── DBT_STAGING         # dbt staging views: stg_customers, stg_orders, stg_order_items, stg_products
 ├── DBT_ANALYTICS       # dbt marts: customer_lifetime_value, customer_segmentation, product_affinity, product_recommendations, monthly_cohorts
-├── POSTGRES            # Snowflake Postgres sync: POSTGRES_SYNC_TASK
-└── PG_LAKE             # Iceberg export: PRODUCT_REVIEWS, SUPPORT_TICKETS, PG_LAKE_REFRESH_TASK
+├── POSTGRES            # Snowflake Postgres sync (schema created outside setup.sql)
+└── PG_LAKE             # Iceberg export (schema created outside setup.sql)
 ```
+
+**Note**: Only RAW, STAGING, DYNAMIC_TABLES, INTERACTIVE, SEMANTIC, MODELS, DBT_STAGING, and DBT_ANALYTICS schemas are created in `setup.sql`. POSTGRES and PG_LAKE schemas are created by their respective component scripts.
 
 ## Key Technical Patterns
 
 ### Snowpipe Streaming
-- **SDK Version**: ALWAYS use v1.0.2 (v1.1.0 has JWT bug - error 390144)
+- **Python SDK**: `snowpipe-streaming>=1.2.0` (high-performance Rust-core package)
+- **Java SDK**: `com.snowflake:snowpipe-streaming:1.1.2` (high-performance package)
 - **Authentication**: RSA key-pair (PEM format, unencrypted)
 - **Account format**: Use hyphens not underscores (e.g., `gen-ai-hol` NOT `gen_ai_hol`)
 - **Role**: Must specify role in profile.json (SDK doesn't default)
 - **Offset tokens**: `order_<id>` for orders, `item_<id>` for order items
 - **Flush behavior**: Data visible after `max.client.lag` (default 60 seconds)
 - **Parallel scaling**: Unique channel names per instance (`_instance_0`, `_instance_1`)
+- **Config**: Schema defined in profile.json (Python) or properties file (Java)
 
 ### Customer Segments (Order Generation)
 - **Premium**: $500-$3000 orders, 10% discount rate (5-10% off), 3-8 items
@@ -68,9 +72,12 @@ AUTOMATED_INTELLIGENCE (Database)
 - **Tier 3** (DOWNSTREAM): `daily_business_metrics`, `product_performance_metrics`
 - **CRITICAL**: Manual refresh does NOT cascade to DOWNSTREAM tables; only scheduled refresh cascades
 - All tables use `REFRESH_MODE = INCREMENTAL`
+- All tables use `AUTOMATED_INTELLIGENCE_WH`
 
 ### Gen2 Warehouses
 - Create with: `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'`
+- Gen2 WH size: XSMALL (`AUTOMATED_INTELLIGENCE_GEN2_WH`)
+- Standard WH size: SMALL (`AUTOMATED_INTELLIGENCE_WH`)
 - Optimized for MERGE/UPDATE/DELETE operations
 - Check region availability before using
 - Staging pattern: Snowpipe → Staging → MERGE → RAW
@@ -80,30 +87,72 @@ AUTOMATED_INTELLIGENCE (Database)
 - **Always-on billing** (no auto-suspend by design)
 - **Preview feature** (select AWS regions only)
 - Cannot query standard tables (only interactive tables)
+- Interactive WH size: XSMALL (`AUTOMATED_INTELLIGENCE_INTERACTIVE_WH`)
+
+### Cortex Search Services
+- **In setup.sql**: `product_search_service` (RAW schema, on PRODUCT_CATALOG, TARGET_LAG = 1 hour)
+- **In snowflake-intelligence/**: `product_reviews_search`, `support_tickets_search` (SEMANTIC schema, on RAW.PRODUCT_REVIEWS and RAW.SUPPORT_TICKETS, TARGET_LAG = 1 hour)
+- All 3 services query RAW tables
+
+### Cortex Agent (Snowflake Intelligence)
+- Agent: `ORDER_ANALYTICS_AGENT` — uses `SEMANTIC_MODEL` referencing a YAML file on a stage
+- Does NOT use SEARCH_SERVICES, SEMANTIC_VIEWS, or TOOLS in agent definition
+- Agent creation SQL is NOT in setup.sql (lives in `snowflake-intelligence/`)
+- Semantic view `business_analytics_semantic` created in setup.sql (SEMANTIC schema)
+- Second semantic view `ORDERS_ANALYTICS_SV` in `snowflake-intelligence/semantic_view_sql_demo.sql`
 
 ### pg_lake (Iceberg Integration)
 - **Never hardcode metadata paths** - they change with each Iceberg commit
 - **Always run `setup.sh`** to get fresh paths from Snowflake
 - Point to Iceberg metadata JSON, NOT raw parquet files
-- Two tasks: `POSTGRES_SYNC_TASK` (Postgres→RAW), `PG_LAKE_REFRESH_TASK` (RAW→Iceberg)
+- Tasks created by separate component scripts (not in setup.sql):
+  - `POSTGRES_SYNC_TASK` (5 min, in snowflake-postgres/)
+  - `PG_LAKE_REFRESH_TASK` (5 min, in pg_lake/)
+
+### Snowflake Postgres
+- Custom `PG_QUERY()` UDTF — takes 1 parameter (SQL string only), no instance name parameter
+- Syncs data to RAW schema tables (not a POSTGRES schema)
+- Hostname is hardcoded in the UDTF definition
 
 ### dbt Analytics
-- Staging models: Views in `dbt_staging` schema
-- Mart models: Tables in `dbt_analytics` schema
+- Staging models: Views in `DBT_STAGING` schema (4 models: stg_customers, stg_orders, stg_order_items, stg_products)
+- Mart models: Tables in `DBT_ANALYTICS` schema (5 models: customer_lifetime_value, customer_segmentation, product_affinity, product_recommendations, monthly_cohorts)
 - Deploy via: `snow dbt deploy` or `dbt build`
+- Sources defined in `sources.yml`, tests in `schema.yml`
 - **Note**: dbt-snowflake does NOT support Workload Identity Federation
 
 ### ML Training
-- GPU acceleration: `tree_method='gpu_hist'` for XGBoost
-- Model Registry for version tracking
-- Deploy as stored procedure for Cortex Agent integration
+- Notebooks (`.ipynb`): `customer_churn_training_ray_cluster.ipynb`, `product_recommendation_gpu_workspace.ipynb`
+- Churn model: sklearn XGBClassifier pipeline (not standalone xgboost)
+- Only stored procedure: `GET_PRODUCT_RECOMMENDATIONS` (no PREDICT_CHURN sproc)
+- SPCS deployment: via `create_service()` API from Model Registry (no Dockerfile)
+- Data sources: INTERACTIVE and RAW schemas
 - Available segments: LOW_ENGAGEMENT, HIGH_VALUE_INACTIVE, NEW_CUSTOMERS, AT_RISK, HIGH_VALUE_ACTIVE
 
 ### Security (RBAC)
-- Row access policies on CUSTOMERS table filter by state
-- WEST_COAST_MANAGER sees only CA, OR, WA
-- Transparent to AI agents - same agent, different answers
+- Row access policy `customers_region_policy` on `RAW.CUSTOMERS` table, `state` column
+- WEST_COAST_MANAGER sees only CA, OR, WA (uses `CURRENT_ROLE()`)
+- Transparent to AI agents — same agent, different answers
 - Policy cascades through JOINs automatically
+- Policy defined in `security-and-governance/`, not in setup.sql
+
+### Streamlit Dashboard
+- Connection: `st.connection('snowflake')` (not `get_active_session()`)
+- Navigation: `st.navigation()` with pages
+- Pages: Summary, Live Ingestion, Pipeline Health, Interactive vs Standard, Gen 1 vs Gen 2, GPU-Accelerated ML, Product Analytics
+- Deploy: `snow streamlit deploy` (deployed to RAW schema as `THE_DASHBOARD`)
+
+## Stored Procedures (setup.sql)
+
+| Procedure | Schema | Purpose |
+|-----------|--------|---------|
+| `generate_customers(INT)` | RAW | Generate synthetic customer records |
+| `merge_staging_to_raw(BOOLEAN)` | STAGING | Gen2 MERGE from staging to RAW |
+| `enrich_raw_data(BOOLEAN)` | STAGING | Enrich RAW data with computed fields |
+| `create_discount_snapshot()` | STAGING | Snapshot discount state for demos |
+| `restore_discount_snapshot()` | STAGING | Restore discount state from snapshot |
+| `truncate_staging_tables()` | STAGING | Clear staging tables between runs |
+| `get_staging_counts()` | STAGING | Check staging table row counts |
 
 ## File Organization
 
@@ -113,29 +162,18 @@ AUTOMATED_INTELLIGENCE (Database)
 | `demo/` | Demo scripts, guides, storylines |
 | `snowpipe-streaming-python/` | Python SDK implementation |
 | `snowpipe-streaming-java/` | Java SDK implementation |
-| `gen2-warehouse/` | Gen2 staging pipeline and procedures |
+| `gen2-warehouse/` | Gen2 demo scripts (DDL is in setup.sql) |
 | `interactive/` | Interactive Tables demo and load testing |
-| `dbt-analytics/` | dbt models (CLV, segmentation, affinity, cohorts) |
-| `ml-training/` | GPU notebooks, Ray training, stored procedures |
+| `dbt-analytics/` | dbt models (CLV, segmentation, affinity, recommendations, cohorts) |
+| `ml-training/` | GPU notebooks and stored procedures |
 | `streamlit-dashboard/` | Real-time monitoring dashboard |
 | `snowflake-intelligence/` | Cortex Agent, Search, semantic models |
 | `security-and-governance/` | RBAC demo with WEST_COAST_MANAGER |
-| `snowflake-postgres/` | Hybrid OLTP/OLAP with Cortex Search |
+| `snowflake-postgres/` | Hybrid OLTP/OLAP with PG_QUERY() UDTF |
 | `pg_lake/` | Iceberg export and external Postgres |
 | `workload-identity/` | Zero-secrets GitHub Actions auth |
 | `snowflake-mcp-server/` | MCP server for external AI agents |
 | `tests/` | Test notebooks and SQL validation |
-
-## Demo Structure (BUILD London 2026)
-
-**Act 1: Developer Tools** (5 min)
-- Cortex Code CLI → VS Code Extension → Snow CLI
-
-**Act 2: Notebooks + ML** (5 min)
-- Workspaces (Git) → Notebook vNext (GPU) → Model Registry → Service Endpoint
-
-**Act 3: Data + Intelligence** (5 min)
-- Snowflake Postgres → Iceberg/pg_lake → Snowflake Intelligence → REST API
 
 ## Common Commands
 
@@ -152,8 +190,8 @@ cd snowpipe-streaming-java && java -jar target/automated-intelligence-streaming-
 # Run dbt
 cd dbt-analytics && dbt build
 
-# Start Streamlit
-cd streamlit-dashboard && streamlit run streamlit_app.py --server.port 8501
+# Deploy Streamlit
+cd streamlit-dashboard && snow streamlit deploy
 
 # Start pg_lake
 cd pg_lake && ./setup.sh
@@ -166,18 +204,18 @@ PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres -f demo_qu
 
 | Issue | Solution |
 |-------|----------|
-| JWT error 390144 | Use Snowpipe SDK v1.0.2, not v1.1.0 |
-| Account auth fails | Use hyphens in account ID, ensure role is specified |
-| Data not appearing | Wait for `max.client.lag` (60s default), check PIPE exists |
+| Account auth fails | Use hyphens in account ID, ensure role is specified in profile.json |
+| Data not appearing | Wait for `max.client.lag` (60s default), check channel exists |
 | Dynamic Tables not cascading | Manual refresh doesn't cascade; only scheduled refresh does |
 | Interactive WH timeout | Queries must complete in 5 seconds; simplify query |
 | pg_lake stale data | Re-run `./setup.sh` to get fresh Iceberg metadata paths |
 | dbt deps fails | Add `EXTERNAL_ACCESS_INTEGRATIONS = (dbt_ext_access)` |
+| Cortex Search not updating | TARGET_LAG is 1 hour; wait or recreate service |
 
 ## Conventions
 
 - **Connection name**: `dash-builder-si` (default for demo)
-- **Role**: `AUTOMATED_INTELLIGENCE` or `SNOWFLAKE_INTELLIGENCE_ADMIN`
-- **Warehouse**: `AUTOMATED_INTELLIGENCE_WH` (standard), `AUTOMATED_INTELLIGENCE_GEN2_WH` (Gen2), `AUTOMATED_INTELLIGENCE_INTERACTIVE_WH` (interactive)
+- **Role**: `AUTOMATED_INTELLIGENCE` or `WEST_COAST_MANAGER` (for RBAC demos)
+- **Warehouses**: `AUTOMATED_INTELLIGENCE_WH` (SMALL, standard), `AUTOMATED_INTELLIGENCE_GEN2_WH` (XSMALL, Gen2), `AUTOMATED_INTELLIGENCE_INTERACTIVE_WH` (XSMALL, interactive)
 - **Profile files**: `profile.json` (git-ignored), use `.template` files as reference
-- **Config files**: `config_default.properties` (RAW schema), `config_staging.properties` (STAGING schema)
+- **Alert**: `data_quality_alert` (5 min schedule, in setup.sql)

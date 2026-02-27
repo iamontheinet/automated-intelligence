@@ -1,0 +1,132 @@
+---
+description: Row access policies, security patterns, and governance configuration
+globs: security-and-governance/**
+alwaysApply: false
+---
+
+# Security & Governance
+
+This component implements row-level security via a Snowflake Row Access Policy, controlling which roles can see which customer data.
+
+## Architecture
+
+```
+AUTOMATED_INTELLIGENCE role (full access)
+ACCOUNTADMIN role (full access)
+WEST_COAST_MANAGER role (filtered — CA, OR, WA only)
+        │
+        ▼
+Row Access Policy
+  └── customers_region_policy → RAW.CUSTOMERS table (on state column)
+        │
+        ▼
+Transparent enforcement on all queries (including JOINs, views, agents)
+```
+
+## Row Access Policy
+
+Defined in `setup_west_coast_manager.sql`:
+
+```sql
+CREATE OR REPLACE ROW ACCESS POLICY customers_region_policy
+AS (state VARCHAR) RETURNS BOOLEAN ->
+    CASE
+        -- Admin roles see everything
+        WHEN CURRENT_ROLE() IN ('AUTOMATED_INTELLIGENCE', 'ACCOUNTADMIN') THEN TRUE
+        -- West Coast Manager sees only their states
+        WHEN CURRENT_ROLE() = 'WEST_COAST_MANAGER'
+             AND state IN ('CA', 'OR', 'WA') THEN TRUE
+        ELSE FALSE  -- Secure default: deny all unmatched
+    END
+COMMENT = 'Restricts west_coast_manager to CA, OR, and WA states only';
+```
+
+### Applied to Table
+
+```sql
+ALTER TABLE AUTOMATED_INTELLIGENCE.RAW.CUSTOMERS
+    ADD ROW ACCESS POLICY customers_region_policy ON (state);
+```
+
+**Note**: The policy is applied to `RAW.CUSTOMERS` only — **not** to ORDERS or ORDER_ITEMS. Filtering on orders happens indirectly through JOINs to CUSTOMERS at query time (the policy cascades through JOINs automatically).
+
+## Critical: CURRENT_ROLE() vs IS_ROLE_IN_SESSION()
+
+This demo uses `CURRENT_ROLE()` which checks **only the active primary role**. The official Snowflake documentation (2025) recommends `IS_ROLE_IN_SESSION()` for most production use cases:
+
+| Function | Behavior | Use Case |
+|----------|----------|----------|
+| `CURRENT_ROLE()` | Checks only the active primary role | Simple demos, single-role setups |
+| `IS_ROLE_IN_SESSION()` | Checks entire role hierarchy (inherited roles) | **Production recommended** — respects RBAC inheritance |
+
+### Why This Matters
+
+With `CURRENT_ROLE()`:
+```sql
+-- If WEST_COAST_MANAGER inherits from REGIONAL_VIEWER,
+-- and policy checks CURRENT_ROLE() = 'REGIONAL_VIEWER',
+-- a user with active role WEST_COAST_MANAGER will be DENIED
+-- even though they logically have the permission via inheritance.
+```
+
+**Recommendation**: For production, replace `CURRENT_ROLE()` with `IS_ROLE_IN_SESSION()` in all policies.
+
+## Memoizable Functions for Performance
+
+For complex role lookups (e.g., mapping roles to regions via a table), use **memoizable functions** to avoid per-row lookup overhead:
+
+```sql
+CREATE OR REPLACE FUNCTION GET_ALLOWED_STATES()
+RETURNS ARRAY
+LANGUAGE SQL
+MEMOIZABLE
+AS
+$$
+  SELECT ARRAY_AGG(STATE)
+  FROM ROLE_STATE_MAPPING
+  WHERE ROLE_NAME = CURRENT_ROLE()
+$$;
+```
+
+## Tables With & Without Policies
+
+| Table | Policy Applied | Notes |
+|-------|---------------|-------|
+| RAW.CUSTOMERS | Yes — `customers_region_policy` on `state` column | Filtered by state (CA, OR, WA) |
+| ORDERS | **No direct policy** | Filtered indirectly via JOIN to CUSTOMERS |
+| ORDER_ITEMS | **No direct policy** | Filtered indirectly via ORDER_ID linkage |
+| PRODUCT_CATALOG | **No policy** | Public catalog, all roles see all products |
+| PRODUCT_REVIEWS | **No policy** | Consider adding if reviews contain PII |
+
+## Key Behaviors
+
+1. **Transparent cascade**: Row access policies apply automatically through JOINs, views, Dynamic Tables, and Cortex Agent queries — no application-level enforcement needed
+2. **ELSE FALSE pattern**: Always end policies with `ELSE FALSE` to deny by default — never `ELSE TRUE`
+3. **Policy on Dynamic Tables**: Dynamic Tables built from policy-protected base tables inherit the filtering at query time (not at refresh time)
+4. **Cortex Agent**: The agent respects row access policies based on the session role of the calling user
+
+## Directory Contents
+
+| File | Purpose |
+|------|---------|
+| `setup_west_coast_manager.sql` | Creates role, policy, grants |
+| `cleanup_west_coast_manager.sql` | Removes all demo artifacts |
+| `README.md` | Documentation (references `demo_west_coast_manager.ipynb` which does not exist) |
+
+## Testing Policies
+
+```sql
+-- Test as full-access role
+USE ROLE AUTOMATED_INTELLIGENCE;
+SELECT COUNT(*) FROM RAW.CUSTOMERS;  -- All rows
+
+-- Test as restricted role
+USE ROLE WEST_COAST_MANAGER;
+SELECT COUNT(*) FROM RAW.CUSTOMERS;  -- Only CA, OR, WA rows
+
+-- Verify the policy is attached
+SELECT * FROM TABLE(INFORMATION_SCHEMA.POLICY_REFERENCES(
+  REF_ENTITY_NAME => 'AUTOMATED_INTELLIGENCE.RAW.CUSTOMERS',
+  REF_ENTITY_DOMAIN => 'TABLE'
+));
+```

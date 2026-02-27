@@ -447,3 +447,6 @@ demo-video/
 *.json.gz
 *.pickle
 *.pkl
+talk/demo-script.md
+talk/handout.md
+talk/slides-outline.md
