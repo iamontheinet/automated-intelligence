@@ -85,6 +85,19 @@ def render_ingestion_dashboard(schema: str, orders_table: str, order_items_table
     
     status_df = session.sql(status_query).to_pandas()
     
+    if status_df.empty:
+        fallback_status_query = f"""
+        SELECT 
+            ORDER_STATUS,
+            COUNT(*) as order_count
+        FROM AUTOMATED_INTELLIGENCE.{schema}.{orders_table}
+        GROUP BY ORDER_STATUS
+        ORDER BY order_count DESC
+        """
+        status_df = session.sql(fallback_status_query).to_pandas()
+        if not status_df.empty:
+            st.warning(f"⚠️ No data available for the last {days} days. Showing all-time distribution...")
+    
     if not status_df.empty:
         fig = px.pie(status_df, values='ORDER_COUNT', names='ORDER_STATUS', height=600)
         fig.update_traces(textposition='inside', textinfo='percent+label')
@@ -121,6 +134,33 @@ def render_ingestion_dashboard(schema: str, orders_table: str, order_items_table
     """
     
     stacked_df = session.sql(stacked_query).to_pandas()
+    
+    if stacked_df.empty:
+        fallback_stacked_query = f"""
+        SELECT 
+            CASE
+                WHEN o.total_amount < 100 THEN 'Small (<$100)'
+                WHEN o.total_amount < 500 THEN 'Medium ($100-$500)'
+                WHEN o.total_amount < 2000 THEN 'Large ($500-$2K)'
+                ELSE 'Extra Large (>$2K)'
+            END AS order_size,
+            oi.product_category,
+            SUM(oi.line_total) as revenue
+        FROM AUTOMATED_INTELLIGENCE.{schema}.{orders_table} o
+        JOIN AUTOMATED_INTELLIGENCE.{schema}.{order_items_table} oi ON o.order_id = oi.order_id
+        GROUP BY order_size, oi.product_category
+        ORDER BY 
+            CASE order_size
+                WHEN 'Small (<$100)' THEN 1
+                WHEN 'Medium ($100-$500)' THEN 2
+                WHEN 'Large ($500-$2K)' THEN 3
+                WHEN 'Extra Large (>$2K)' THEN 4
+            END,
+            oi.product_category
+        """
+        stacked_df = session.sql(fallback_stacked_query).to_pandas()
+        if not stacked_df.empty:
+            st.warning(f"⚠️ No data available for the last {days} days. Showing all-time category sales...")
     
     if not stacked_df.empty:
         fig = px.bar(stacked_df, x='ORDER_SIZE', y='REVENUE', color='PRODUCT_CATEGORY',
