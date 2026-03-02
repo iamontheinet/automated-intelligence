@@ -159,7 +159,7 @@ AUTOMATED_INTELLIGENCE (Database)
 | Directory | Purpose |
 |-----------|---------|
 | `setup.sql` | Core infrastructure (run first) |
-| `demo/` | Demo scripts, guides, storylines |
+| `talk/` | Demo narrative, talk slides, demo script, handout |
 | `snowpipe-streaming-python/` | Python SDK implementation |
 | `snowpipe-streaming-java/` | Java SDK implementation |
 | `gen2-warehouse/` | Gen2 demo scripts (DDL is in setup.sql) |
