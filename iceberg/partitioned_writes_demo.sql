@@ -182,6 +182,213 @@ CREATE OR REPLACE ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.EXTERNAL_ORDERS
 */
 
 -- ============================================================================
+-- ============================================================================
+--
+--  ICEBERG V3 FEATURES (Preview - March 2026)
+--
+--  Apache Iceberg v3 introduces three key capabilities:
+--    1. Deletion Vectors  - Puffin files replace positional deletes
+--    2. Row Lineage       - _row_id and _last_updated_sequence_number
+--    3. Default Values    - Column-level defaults in the schema
+--
+--  ⚠️  V3 is currently in PREVIEW. The upgrade from v2 to v3 is ONE-WAY
+--      and cannot be reversed.
+--  ⚠️  V3 tables are NOT readable by pg_lake (DuckDB v1.3.2 supports v1/v2
+--      only). Do NOT upgrade tables consumed by pg_lake.
+--
+-- ============================================================================
+-- ============================================================================
+
+-- ============================================================================
+-- PART 9: Create an Iceberg V3 Table
+-- ============================================================================
+-- Setting FORMAT_VERSION = 3 creates a v3 table with deletion vectors
+-- and row lineage enabled automatically.
+
+CREATE OR REPLACE ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+    CATALOG = 'SNOWFLAKE'
+    EXTERNAL_VOLUME = 'my_iceberg_volume'  -- Replace with actual volume
+    BASE_LOCATION = 'orders_v3/'
+    FORMAT_VERSION = 3
+AS
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    total_amount,
+    order_status
+FROM AUTOMATED_INTELLIGENCE.RAW.ORDERS
+LIMIT 500;
+
+-- Verify the table was created as v3
+DESCRIBE ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3;
+
+-- Check row count after initial load
+SELECT COUNT(*) AS initial_row_count
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3;
+
+-- ============================================================================
+-- PART 10: Deletion Vectors (Merge-on-Read)
+-- ============================================================================
+-- In v2, UPDATE/DELETE/MERGE rewrites entire data files (copy-on-write).
+-- In v3, these operations write lightweight Puffin "deletion vector" files
+-- that mark rows as deleted without rewriting the original Parquet files.
+-- This dramatically reduces write amplification for update-heavy workloads.
+
+-- UPDATE: marks old row values via deletion vector, writes new values
+UPDATE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+SET    order_status = 'UPDATED_V3',
+       total_amount = total_amount * 1.10
+WHERE  order_id IN (
+    SELECT order_id
+    FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+    LIMIT 10
+);
+
+-- DELETE: writes a deletion vector instead of rewriting the data file
+DELETE FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+WHERE  order_status = 'CANCELLED'
+AND    order_id IN (
+    SELECT order_id
+    FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+    WHERE order_status = 'CANCELLED'
+    LIMIT 5
+);
+
+-- MERGE: benefits most from deletion vectors — mixed insert/update/delete
+-- operations generate small Puffin files instead of full file rewrites
+MERGE INTO AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3 AS target
+USING (
+    SELECT
+        order_id,
+        customer_id,
+        order_date,
+        total_amount * 1.05 AS total_amount,
+        'MERGED_V3' AS order_status
+    FROM AUTOMATED_INTELLIGENCE.RAW.ORDERS
+    LIMIT 20
+) AS source
+ON target.order_id = source.order_id
+WHEN MATCHED THEN
+    UPDATE SET
+        target.total_amount  = source.total_amount,
+        target.order_status  = source.order_status
+WHEN NOT MATCHED THEN
+    INSERT (order_id, customer_id, order_date, total_amount, order_status)
+    VALUES (source.order_id, source.customer_id, source.order_date,
+            source.total_amount, source.order_status);
+
+-- Verify the results of deletion-vector-backed operations
+SELECT order_status, COUNT(*) AS cnt
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+GROUP BY order_status
+ORDER BY cnt DESC;
+
+-- ============================================================================
+-- PART 11: Row Lineage
+-- ============================================================================
+-- V3 tables automatically track two metadata fields on every row:
+--   _row_id                         – unique identifier per row
+--   _last_updated_sequence_number   – commit sequence that last touched the row
+--
+-- These enable efficient incremental processing and change-data-capture
+-- without external CDC tooling.
+
+-- Query row lineage fields alongside business data
+SELECT
+    order_id,
+    order_status,
+    total_amount,
+    _row_id,
+    _last_updated_sequence_number
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+ORDER BY _last_updated_sequence_number DESC, _row_id
+LIMIT 20;
+
+-- Identify rows changed after a specific commit sequence
+-- (useful for incremental ETL — only process rows modified since last run)
+SELECT
+    order_id,
+    order_status,
+    _row_id,
+    _last_updated_sequence_number
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+WHERE _last_updated_sequence_number > 1
+ORDER BY _last_updated_sequence_number, _row_id;
+
+-- Count rows by their last-update sequence to see the commit distribution
+SELECT
+    _last_updated_sequence_number AS commit_seq,
+    COUNT(*)                      AS rows_touched
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+GROUP BY _last_updated_sequence_number
+ORDER BY commit_seq;
+
+-- ============================================================================
+-- PART 12: Default Values & V2-to-V3 Upgrade
+-- ============================================================================
+-- V3 supports column-level default values in the schema.
+-- When a new column is added with a DEFAULT, existing rows return the
+-- default without a backfill rewrite.
+
+ALTER ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+    ADD COLUMN priority VARCHAR DEFAULT 'STANDARD';
+
+-- New inserts pick up the default automatically
+INSERT INTO AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+    (order_id, customer_id, order_date, total_amount, order_status)
+VALUES
+    (999901, 'CUST_V3_A', CURRENT_DATE, 150.00, 'NEW'),
+    (999902, 'CUST_V3_B', CURRENT_DATE, 275.50, 'NEW');
+
+-- Existing rows return the default; new rows show explicit or default value
+SELECT order_id, order_status, priority
+FROM AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3
+WHERE order_id >= 999901
+   OR priority IS NOT NULL
+ORDER BY order_id DESC
+LIMIT 10;
+
+-- ---------------------------------------------------------------------------
+-- Upgrading an existing V2 table to V3 (one-way, cannot downgrade)
+-- ---------------------------------------------------------------------------
+-- ⚠️  Only upgrade tables that are NOT consumed by v2-only readers (e.g. pg_lake).
+-- The upgrade is atomic and does not rewrite data files.
+/*
+ALTER ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_PARTITIONED
+    SET FORMAT_VERSION = 3;
+*/
+
+-- ============================================================================
+-- PART 13: Cleanup & Compatibility Notes
+-- ============================================================================
+
+-- Drop the v3 demo table (optional — uncomment to clean up)
+-- DROP ICEBERG TABLE IF EXISTS AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3;
+
+-- ---------------------------------------------------------------------------
+-- Compatibility matrix (as of March 2026):
+-- ---------------------------------------------------------------------------
+-- | Reader / Engine           | v1  | v2  | v3  |
+-- |---------------------------|-----|-----|-----|
+-- | Snowflake (managed)       | ✅  | ✅  | ✅  (Preview) |
+-- | pg_lake / DuckDB v1.3.2   | ✅  | ✅  | ❌  |
+-- | DuckDB v1.4.x             | ✅  | ✅  | ❌  (roadmap) |
+-- | Apache Spark 3.5+         | ✅  | ✅  | ✅  |
+-- | Starburst Galaxy          | ✅  | ✅  | ✅  |
+-- | Trino (open-source)       | ✅  | ✅  | ❌  (roadmap) |
+-- ---------------------------------------------------------------------------
+--
+-- Key takeaways:
+--   • V3 is ideal for Snowflake-only or Spark-based pipelines today.
+--   • Do NOT upgrade tables consumed by pg_lake until DuckDB ships v3 support.
+--   • Deletion vectors reduce write amplification for MERGE-heavy workloads.
+--   • Row lineage (_row_id, _last_updated_sequence_number) enables lightweight
+--     incremental processing without external CDC infrastructure.
+--   • The v2 → v3 upgrade is atomic and instant, but irreversible.
+-- ---------------------------------------------------------------------------
+
+-- ============================================================================
 -- Demo Complete
 -- ============================================================================
-SELECT '✅ Iceberg Partitioned Writes Demo Complete!' AS status;
+SELECT '✅ Iceberg Partitioned Writes Demo Complete (including V3 Preview)!' AS status;

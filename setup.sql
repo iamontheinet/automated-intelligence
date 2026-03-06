@@ -1163,7 +1163,7 @@ DESCRIBE SEMANTIC VIEW business_analytics_semantic;
 -- Infrastructure Features:
 --   - sql-features/gen2-warehouse/gen2_optima_demo.sql (Gen2 + Optima Indexing)
 --   - sql-features/data-quality/dmf_expectations_demo.sql (Data Metric Functions)
---   - sql-features/iceberg/iceberg_partitioning_demo.sql (Iceberg tables)
+--   - iceberg/partitioned_writes_demo.sql (Iceberg tables + v3 preview)
 --
 -- ML & AI:
 --   - sql-features/ml-models/huggingface_import_demo.sql (HuggingFace models)

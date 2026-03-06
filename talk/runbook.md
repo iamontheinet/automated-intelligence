@@ -1695,7 +1695,7 @@ data-quality/
 └── data_quality_expectations_demo.sql   # Data Metric Functions
 
 iceberg/
-└── partitioned_writes_demo.sql      # Iceberg partitioning
+└── partitioned_writes_demo.sql      # Iceberg partitioning + v3 preview
 
 snowflake-intelligence/
 ├── semantic_view_sql_demo.sql       # SQL-based semantic views
@@ -1934,7 +1934,7 @@ Or keep the structure and just add more data:
 - **Time Series**: `sql-features/time_series_gap_filling_demo.sql` - RESAMPLE, interpolation
 - **ASYNC SQL**: `sql-features/async_sql_demo.sql` - Parallel query execution
 - **Data Quality**: `data-quality/data_quality_expectations_demo.sql` - Metric functions
-- **Iceberg**: `iceberg/partitioned_writes_demo.sql` - Partitioned tables
+- **Iceberg**: `iceberg/partitioned_writes_demo.sql` - Partitioned tables + v3 preview (deletion vectors, row lineage, default values)
 - **HuggingFace**: `ml-models/huggingface_import_demo.sql` - Model import
 - **CREATE OR ALTER**: `sql-features/create_or_alter_demo.sql` - Idempotent DDL
 - **Performance**: `monitoring/performance_explorer_reference.sql` - Query analysis

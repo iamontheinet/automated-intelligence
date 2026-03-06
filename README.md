@@ -637,7 +637,7 @@ Located in the `sql-features/`, `ai-sql-demo/`, `gen2-warehouse/`, `data-quality
 | `sql-features/time_series_gap_filling_demo.sql` | Time Series Gap-Filling | RESAMPLE clause with INTERPOLATE_FFILL/BFILL/LINEAR |
 | `sql-features/async_sql_demo.sql` | ASYNC SQL | Parallel query execution with `ASYNC()` and `AWAIT ALL` |
 | `data-quality/data_quality_expectations_demo.sql` | Data Quality Expectations | Data Metric Functions for monitoring |
-| `iceberg/partitioned_writes_demo.sql` | Iceberg Partitioned Writes | CREATE ICEBERG TABLE with partition expressions |
+| `iceberg/partitioned_writes_demo.sql` | Iceberg Partitioned Writes + V3 Preview | CREATE ICEBERG TABLE with partition expressions, plus Iceberg v3 features (deletion vectors, row lineage, default values) |
 | `snowflake-intelligence/cortex_analyst_routing_demo.sql` | Cortex Analyst Routing | Multi-semantic-model routing mode |
 | `ml-models/huggingface_import_demo.sql` | HuggingFace Import | Import pre-trained models from HuggingFace Hub |
 | `sql-features/create_or_alter_demo.sql` | CREATE OR ALTER DDL | Idempotent object management |
@@ -1341,7 +1341,7 @@ automated-intelligence/
 │   └── data_quality_expectations_demo.sql  # Data Metric Functions demo
 │
 ├── iceberg/                    # Iceberg Table Features
-│   └── partitioned_writes_demo.sql   # Iceberg partitioned writes demo
+│   └── partitioned_writes_demo.sql   # Iceberg partitioned writes + v3 preview (deletion vectors, row lineage)
 │
 ├── ml-models/                  # ML Model Features
 │   └── huggingface_import_demo.sql   # HuggingFace model import demo
