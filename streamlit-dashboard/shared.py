@@ -23,7 +23,7 @@ def format_number(num, include_decimals=True):
     if include_decimals:
         return f"{formatted:.2f}{suffix}"
     else:
-        return f"{formatted:.1f}{suffix}"
+        return f"{formatted:.2f}{suffix}"
 
 def is_streamlit_in_snowflake():
     """Detect if running in Streamlit in Snowflake"""
