@@ -29,22 +29,19 @@ Gen2 warehouse is created in the root `setup.sql` (line ~335), not within this d
 ```sql
 CREATE WAREHOUSE IF NOT EXISTS automated_intelligence_gen2_wh
   WAREHOUSE_SIZE = 'XSMALL'
-  RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'
+  GENERATION = '2'
   AUTO_SUSPEND = 60
   AUTO_RESUME = TRUE
   INITIALLY_SUSPENDED = TRUE;
 ```
 
-### Syntax Note
-
-This project uses `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'`. Snowflake also supports the newer `GENERATION = '2'` syntax (recommended for new code, GA Jul 2025). Both are equivalent.
-
-### Key Constraints (Official Docs, 2025)
+### Key Constraints (Official Docs)
 
 | Feature | Detail |
 |---------|--------|
-| **Syntax** | `GENERATION = '2'` (recommended) or `RESOURCE_CONSTRAINT = STANDARD_GEN_2` (used here) |
-| **Credit cost** | 1.35× on AWS, 1.25× on Azure vs Gen1 |
+| **Syntax** | `GENERATION = '2'` (recommended, GA Jul 2025) |
+| **Legacy syntax** | `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'` (still works but avoid in new code) |
+| **Credit cost** | 1.35x on AWS, 1.25x on Azure vs Gen1 |
 | **Size limits** | Not available for X5LARGE or X6LARGE |
 | **Default** | Gen2 is default for new orgs created after Jul 2025 |
 | **Scaling** | Standard and Economy scaling policies supported |

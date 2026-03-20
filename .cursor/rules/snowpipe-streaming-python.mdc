@@ -21,9 +21,9 @@ Snowflake ORDERS / ORDER_ITEMS tables (RAW schema)
 
 ## SDK Version
 
-- **`requirements.txt` specifies `snowpipe-streaming>=1.2.0`** (the high-performance SDK package)
+- **`requirements.txt` specifies `snowflake-ingest>=0.6.0`** (the correct PyPI package)
 - Import path uses `from snowflake.ingest.streaming import StreamingIngestClient`
-- The `snowpipe-streaming` PyPI package (Rust-based core, GA Sep 2025) supersedes the older `snowflake-ingest` package
+- The PyPI package name is `snowflake-ingest` (not `snowpipe-streaming` — that package does not exist on PyPI)
 
 ### Classic vs High-Performance SDK
 

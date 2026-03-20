@@ -43,13 +43,15 @@ GRANT SELECT ON AUTOMATED_INTELLIGENCE.DYNAMIC_TABLES.ENRICHED_ORDER_ITEMS TO RO
 -- - Admin: sees ALL states (10 total)
 -- - West Coast Manager: sees ONLY CA, OR, WA
 
+-- Uses IS_ROLE_IN_SESSION() instead of CURRENT_ROLE() to support role hierarchy
+-- and secondary roles. CURRENT_ROLE() only checks the active primary role.
 CREATE OR REPLACE ROW ACCESS POLICY customers_region_policy
 AS (state VARCHAR) RETURNS BOOLEAN ->
     CASE 
-        -- Admin roles see everything
-        WHEN CURRENT_ROLE() IN ('AUTOMATED_INTELLIGENCE', 'ACCOUNTADMIN') THEN TRUE
+        -- Admin roles see everything (checks full role hierarchy)
+        WHEN IS_ROLE_IN_SESSION('AUTOMATED_INTELLIGENCE') OR IS_ROLE_IN_SESSION('ACCOUNTADMIN') THEN TRUE
         -- West Coast Manager sees only their region
-        WHEN CURRENT_ROLE() = 'WEST_COAST_MANAGER' 
+        WHEN IS_ROLE_IN_SESSION('WEST_COAST_MANAGER') 
              AND state IN ('CA', 'OR', 'WA') THEN TRUE
         ELSE FALSE
     END

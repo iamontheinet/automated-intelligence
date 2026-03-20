@@ -337,7 +337,7 @@ WITH
     WAREHOUSE_SIZE = 'XSMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
-    RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'
+    GENERATION = '2'
     COMMENT = 'Gen2 warehouse for data transformation';
 
 -- Procedure: merge_staging_to_raw

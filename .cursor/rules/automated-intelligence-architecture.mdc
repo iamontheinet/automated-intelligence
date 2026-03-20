@@ -75,7 +75,8 @@ AUTOMATED_INTELLIGENCE (Database)
 - All tables use `AUTOMATED_INTELLIGENCE_WH`
 
 ### Gen2 Warehouses
-- Create with: `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'`
+- Create with: `GENERATION = '2'` (recommended, GA Jul 2025)
+- Legacy syntax `RESOURCE_CONSTRAINT = 'STANDARD_GEN_2'` still works but avoid in new code
 - Gen2 WH size: XSMALL (`AUTOMATED_INTELLIGENCE_GEN2_WH`)
 - Standard WH size: SMALL (`AUTOMATED_INTELLIGENCE_WH`)
 - Optimized for MERGE/UPDATE/DELETE operations

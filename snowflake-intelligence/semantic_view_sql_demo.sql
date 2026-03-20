@@ -113,7 +113,7 @@ SHOW SEMANTIC DIMENSIONS IN AUTOMATED_INTELLIGENCE.SEMANTIC.ORDERS_ANALYTICS_SV;
 SHOW SEMANTIC METRICS IN AUTOMATED_INTELLIGENCE.SEMANTIC.ORDERS_ANALYTICS_SV;
 
 -- ============================================================================
--- PART 3: Query the Semantic View with Standard SQL (Preview Jan 2026)
+-- PART 3: Query the Semantic View with Standard SQL (GA March 2, 2026)
 -- ============================================================================
 
 -- Semantic views can be queried like regular views
