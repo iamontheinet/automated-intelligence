@@ -1100,7 +1100,11 @@ FACTS (
     
     items.unit_price AS unit_price
         WITH SYNONYMS = ('price', 'cost', 'item_price')
-        COMMENT = 'Price per unit'
+        COMMENT = 'Price per unit',
+    
+    items.line_total AS line_total
+        WITH SYNONYMS = ('item_total', 'line_amount', 'item_revenue')
+        COMMENT = 'Total value of the line item (quantity * unit_price)'
 )
 DIMENSIONS (
     orders.order_status AS order_status
@@ -1119,7 +1123,11 @@ DIMENSIONS (
         COMMENT = 'Customer first name',
     
     customers.last_name AS last_name
-        COMMENT = 'Customer last name'
+        COMMENT = 'Customer last name',
+    
+    items.product_category AS product_category
+        WITH SYNONYMS = ('category', 'product_type', 'item_category')
+        COMMENT = 'Product category classification'
 )
 METRICS (
     orders.total_revenue AS SUM(total_amount)
@@ -1136,7 +1144,11 @@ METRICS (
     
     orders.average_order_value AS AVG(total_amount)
         WITH SYNONYMS = ('aov', 'avg_order', 'mean_order_value')
-        COMMENT = 'Average monetary value per order'
+        COMMENT = 'Average monetary value per order',
+    
+    items.total_items_revenue AS SUM(line_total)
+        WITH SYNONYMS = ('item_revenue', 'product_revenue', 'line_item_sales')
+        COMMENT = 'Sum of all line item totals'
 )
 COMMENT = 'Semantic layer for natural language business analytics queries';
 
