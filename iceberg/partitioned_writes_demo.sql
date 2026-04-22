@@ -360,35 +360,89 @@ ALTER ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_PARTITIONED
 */
 
 -- ============================================================================
--- PART 13: Cleanup & Compatibility Notes
+-- PART 13: Dynamic Iceberg Tables (GA April 2026)
+-- ============================================================================
+-- Dynamic Iceberg tables now support PARTITION BY, TARGET_FILE_SIZE, and
+-- PATH_LAYOUT for optimized write patterns and cross-engine interoperability.
+-- Also: table/column descriptions propagate from external catalogs (GA Apr 2026).
+
+-- Dynamic Iceberg table with partitioning and file size control
+CREATE OR REPLACE DYNAMIC ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.DAILY_ORDERS_ICEBERG
+    CATALOG = 'SNOWFLAKE'
+    EXTERNAL_VOLUME = 'my_iceberg_volume'  -- Replace with actual volume
+    BASE_LOCATION = 'daily_orders_dynamic/'
+    TARGET_LAG = '1 hour'
+    WAREHOUSE = AUTOMATED_INTELLIGENCE_WH
+    PARTITION BY (order_year, order_month)
+    TARGET_FILE_SIZE = 256  -- MB, controls Parquet file size for downstream readers
+AS
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    YEAR(order_date) AS order_year,
+    MONTH(order_date) AS order_month,
+    total_amount,
+    order_status
+FROM AUTOMATED_INTELLIGENCE.RAW.ORDERS;
+
+-- Dynamic Iceberg table with PATH_LAYOUT for Hive-compatible partition paths
+-- (enables direct reads from Spark/Trino/Presto without metadata catalog)
+/*
+CREATE OR REPLACE DYNAMIC ICEBERG TABLE AUTOMATED_INTELLIGENCE.ICEBERG.HIVE_COMPAT_ORDERS
+    CATALOG = 'SNOWFLAKE'
+    EXTERNAL_VOLUME = 'my_iceberg_volume'
+    BASE_LOCATION = 'hive_orders/'
+    TARGET_LAG = '1 hour'
+    WAREHOUSE = AUTOMATED_INTELLIGENCE_WH
+    PARTITION BY (order_year, order_month)
+    PATH_LAYOUT = 'order_year={order_year}/order_month={order_month}'
+    TARGET_FILE_SIZE = 128
+AS
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    YEAR(order_date) AS order_year,
+    MONTH(order_date) AS order_month,
+    total_amount
+FROM AUTOMATED_INTELLIGENCE.RAW.ORDERS;
+*/
+
+
+-- ============================================================================
+-- PART 14: Cleanup & Compatibility Notes
 -- ============================================================================
 
 -- Drop the v3 demo table (optional — uncomment to clean up)
 -- DROP ICEBERG TABLE IF EXISTS AUTOMATED_INTELLIGENCE.ICEBERG.ORDERS_V3;
 
 -- ---------------------------------------------------------------------------
--- Compatibility matrix (as of March 2026):
+-- Compatibility matrix (as of April 2026):
 -- ---------------------------------------------------------------------------
 -- | Reader / Engine           | v1  | v2  | v3  |
 -- |---------------------------|-----|-----|-----|
--- | Snowflake (managed)       | ✅  | ✅  | ✅  (Preview) |
--- | pg_lake / DuckDB v1.3.2   | ✅  | ✅  | ❌  |
--- | DuckDB v1.4.x             | ✅  | ✅  | ❌  (roadmap) |
--- | Apache Spark 3.5+         | ✅  | ✅  | ✅  |
--- | Starburst Galaxy          | ✅  | ✅  | ✅  |
--- | Trino (open-source)       | ✅  | ✅  | ❌  (roadmap) |
+-- | Snowflake (managed)       | yes | yes | yes (Preview) |
+-- | pg_lake / DuckDB v1.3.2   | yes | yes | no            |
+-- | DuckDB v1.4+              | yes | yes | no  (roadmap)  |
+-- | Apache Spark 3.5+         | yes | yes | yes            |
+-- | Starburst Galaxy          | yes | yes | yes            |
+-- | Trino (open-source)       | yes | yes | no  (roadmap)  |
 -- ---------------------------------------------------------------------------
 --
 -- Key takeaways:
---   • V3 is ideal for Snowflake-only or Spark-based pipelines today.
---   • Do NOT upgrade tables consumed by pg_lake until DuckDB ships v3 support.
---   • Deletion vectors reduce write amplification for MERGE-heavy workloads.
---   • Row lineage (_row_id, _last_updated_sequence_number) enables lightweight
+--   - V3 is ideal for Snowflake-only or Spark-based pipelines today.
+--   - Do NOT upgrade tables consumed by pg_lake until DuckDB ships v3 support.
+--   - Deletion vectors reduce write amplification for MERGE-heavy workloads.
+--   - Row lineage (_row_id, _last_updated_sequence_number) enables lightweight
 --     incremental processing without external CDC infrastructure.
---   • The v2 → v3 upgrade is atomic and instant, but irreversible.
+--   - The v2 to v3 upgrade is atomic and instant, but irreversible.
+--   - Dynamic Iceberg tables with PARTITION BY + TARGET_FILE_SIZE are GA Apr 2026.
+--   - Table/column descriptions from external catalogs (Unity, Glue) now
+--     propagate into Snowflake automatically (GA Apr 2026).
 -- ---------------------------------------------------------------------------
 
 -- ============================================================================
 -- Demo Complete
 -- ============================================================================
-SELECT '✅ Iceberg Partitioned Writes Demo Complete (including V3 Preview)!' AS status;
+SELECT 'Iceberg Partitioned Writes Demo Complete (including V3 Preview + Dynamic Iceberg)' AS status;

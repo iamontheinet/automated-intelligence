@@ -598,6 +598,7 @@ DROP DYNAMIC TABLE IF EXISTS enriched_orders;
 CREATE OR REPLACE DYNAMIC TABLE enriched_orders
 TARGET_LAG = '1 minute'
 WAREHOUSE = automated_intelligence_wh
+SCHEDULER = ENABLE
 REFRESH_MODE = INCREMENTAL
 AS
 SELECT
@@ -646,6 +647,7 @@ FROM automated_intelligence.raw.orders o;
 CREATE OR REPLACE DYNAMIC TABLE enriched_order_items
 TARGET_LAG = '1 minute'
 WAREHOUSE = automated_intelligence_wh
+SCHEDULER = ENABLE
 REFRESH_MODE = INCREMENTAL
 AS
 SELECT
@@ -684,6 +686,7 @@ FROM automated_intelligence.raw.order_items oi;
 CREATE OR REPLACE DYNAMIC TABLE fact_orders
 TARGET_LAG = DOWNSTREAM
 WAREHOUSE = automated_intelligence_wh
+SCHEDULER = ENABLE
 REFRESH_MODE = INCREMENTAL
 AS
 SELECT
@@ -742,6 +745,7 @@ INNER JOIN automated_intelligence.dynamic_tables.enriched_order_items eoi
 CREATE OR REPLACE DYNAMIC TABLE daily_business_metrics
 TARGET_LAG = DOWNSTREAM
 WAREHOUSE = automated_intelligence_wh
+SCHEDULER = ENABLE
 REFRESH_MODE = INCREMENTAL
 AS
 SELECT
@@ -788,6 +792,7 @@ GROUP BY
 CREATE OR REPLACE DYNAMIC TABLE product_performance_metrics
 TARGET_LAG = DOWNSTREAM
 WAREHOUSE = automated_intelligence_wh
+SCHEDULER = ENABLE
 REFRESH_MODE = INCREMENTAL
 AS
 SELECT

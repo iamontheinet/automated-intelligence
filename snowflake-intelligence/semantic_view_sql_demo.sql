@@ -161,6 +161,40 @@ SELECT SYSTEM$GENERATE_SEMANTIC_VIEW_YAML('AUTOMATED_INTELLIGENCE.SEMANTIC.ORDER
 */
 
 -- ============================================================================
+-- PART 6: Query Semantic View with Standard SQL FROM Clause (GA March 2026)
+-- ============================================================================
+-- You can now query semantic views directly in the FROM clause like a regular
+-- table, instead of using the SEMANTIC_VIEW() function. This makes semantic
+-- views a first-class citizen in SQL.
+
+-- Old syntax (still works):
+SELECT * FROM SEMANTIC_VIEW(
+    ORDERS_ANALYTICS_SV
+    DIMENSIONS orders.order_date
+    METRICS orders.total_revenue
+)
+ORDER BY order_date;
+
+-- New syntax (GA March 2026) — standard SQL:
+SELECT
+    order_date,
+    SUM(total_revenue) AS total_revenue
+FROM ORDERS_ANALYTICS_SV
+GROUP BY order_date
+ORDER BY order_date;
+
+-- You can use all standard SQL clauses: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT
+SELECT
+    customer_segment,
+    SUM(total_revenue) AS segment_revenue,
+    COUNT(DISTINCT order_count) AS total_orders
+FROM ORDERS_ANALYTICS_SV
+WHERE order_status = 'COMPLETED'
+GROUP BY customer_segment
+HAVING SUM(total_revenue) > 10000
+ORDER BY segment_revenue DESC;
+
+-- ============================================================================
 -- Demo Complete
 -- ============================================================================
 SELECT '✅ Semantic View SQL Demo Complete!' AS status;

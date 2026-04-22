@@ -7,6 +7,7 @@ from config_manager import ConfigManager
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+import random
 import time
 
 logger = logging.getLogger(__name__)
@@ -210,11 +211,12 @@ class SnowpipeStreamingManager:
                 # Check for ReceiverSaturated (HTTP 429) backpressure errors
                 if "ReceiverSaturated" in error_msg or "429" in error_msg:
                     if attempt < max_retries - 1:
+                        jitter = random.uniform(0, delay * 0.25)
                         logger.warning(
                             f"Backpressure detected for {data_type} (attempt {attempt + 1}/{max_retries}): "
-                            f"Channel buffers full. Retrying in {delay:.1f}s..."
+                            f"Channel buffers full. Retrying in {delay + jitter:.1f}s..."
                         )
-                        time.sleep(delay)
+                        time.sleep(delay + jitter)
                         delay = min(delay * 2, max_delay)  # Exponential backoff
                         continue
                     else:

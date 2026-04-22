@@ -208,6 +208,71 @@ matches for targeted marketing campaigns.
 - Support tickets search - discover issues and complaints
 - Natural language queries in Snowflake Intelligence via Cortex Agent
 
+## Cortex Agent Evaluations (GA March 2026)
+
+Cortex Agent Evaluations let you systematically test and measure agent quality against ground truth and reference-free metrics.
+
+### System Metrics
+
+- **Answer correctness** -- compares agent response against ground truth (`ground_truth_output` key in VARIANT column)
+- **Logical consistency** -- reference-free metric measuring consistency across agent instructions, planning, and tool calls (no ground truth needed)
+- **Custom metrics** -- LLM judge prompts with `{{ground_truth}}` placeholder for domain-specific evaluation
+
+### Quick Start
+
+```sql
+-- 1. Create evaluation source table (query + ground truth VARIANT)
+CREATE OR REPLACE TABLE AUTOMATED_INTELLIGENCE.SEMANTIC.AGENT_EVAL_TABLE (
+    input_query VARCHAR,
+    ground_truth VARIANT
+);
+
+INSERT INTO AUTOMATED_INTELLIGENCE.SEMANTIC.AGENT_EVAL_TABLE
+SELECT column1, PARSE_JSON(column2) FROM VALUES
+    ('What were total sales last month?',
+     '{"ground_truth_output": "The agent should use the cortex_analyst_text_to_sql tool to query revenue data and return a dollar amount for the previous month."}'),
+    ('Find reviews about boot quality',
+     '{"ground_truth_output": "The agent should use the search_reviews tool to find product reviews mentioning boots, quality issues, or defects."}'),
+    ('Show me open shipping complaint tickets',
+     '{"ground_truth_output": "The agent should use the search_tickets tool to find support tickets related to shipping delays, lost packages, or delivery complaints."}');
+
+-- 2. Register as evaluation dataset
+CALL SYSTEM$CREATE_EVALUATION_DATASET(
+    'Cortex Agent',
+    'AUTOMATED_INTELLIGENCE.SEMANTIC.AGENT_EVAL_TABLE',
+    'AUTOMATED_INTELLIGENCE.SEMANTIC.BUSINESS_AGENT_EVALSET',
+    OBJECT_CONSTRUCT('query_text', 'INPUT_QUERY', 'ground_truth', 'GROUND_TRUTH')
+);
+
+-- 3. Run evaluation (returns evaluation run ID)
+SELECT EXECUTE_AI_EVALUATION('START', {
+    'evaluation_name': 'business_agent_eval_run_1',
+    'agent': 'AUTOMATED_INTELLIGENCE.SEMANTIC.BUSINESS_INSIGHTS_AGENT',
+    'dataset': 'AUTOMATED_INTELLIGENCE.SEMANTIC.BUSINESS_AGENT_EVALSET',
+    'metrics': ['answer_correctness', 'logical_consistency']
+});
+
+-- 4. Check evaluation status
+SELECT EXECUTE_AI_EVALUATION('STATUS', {
+    'evaluation_name': 'business_agent_eval_run_1'
+});
+
+-- 5. Retrieve evaluation results
+SELECT * FROM TABLE(SNOWFLAKE.LOCAL.GET_AI_EVALUATION_DATA(
+    'business_agent_eval_run_1'
+));
+```
+
+See `cortex_agent_evaluations_demo.sql` for the complete walkthrough.
+
+### When to Evaluate
+
+- After modifying agent specification (tools, models, instructions)
+- After updating semantic views or search service data
+- Before promoting agent changes to production
+- As part of CI/CD pipelines via `snow sql -f`
+
 ## Related Demos
 - **ML Training**: Train and deploy product recommendation model as custom agent tool
 - **Streamlit Dashboard**: Integrates with Cortex Agent for natural language queries
+- **Semantic View SQL Demo**: Standard SQL FROM clause queries on semantic views (GA March 2026)

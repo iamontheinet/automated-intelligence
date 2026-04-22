@@ -1,9 +1,11 @@
 import logging
+import random
 import sys
 import time
 from typing import List
 from config_manager import ConfigManager
 from snowpipe_streaming_manager import SnowpipeStreamingManager
+from snowflake.ingest.streaming.streaming_ingest_error import StreamingIngestError
 from reconciliation_manager import ReconciliationManager
 from data_generator import DataGenerator
 from models import Order, OrderItem
@@ -67,34 +69,37 @@ class AutomatedIntelligenceStreaming:
             orders_inserted = False
             items_inserted = False
             
-            # Step 1: Insert orders with retry
+            # Step 1: Insert orders with retry (exponential backoff + jitter)
             for retry_count in range(max_retries + 1):
                 try:
                     self.streaming_manager.insert_orders(order_batch)
                     orders_inserted = True
                     break
-                except Exception as e:
+                except StreamingIngestError as e:
                     if retry_count >= max_retries:
                         logger.error(
                             f"Failed to insert orders after {max_retries + 1} attempts: {e}",
                             exc_info=True
                         )
                         raise
+                    delay = min(2 ** retry_count, 16)
+                    jitter = random.uniform(0, delay * 0.25)
                     logger.warning(
-                        f"Orders insert failed (attempt {retry_count + 1}/{max_retries + 1}), retrying: {e}"
+                        f"Orders insert failed (attempt {retry_count + 1}/{max_retries + 1}), "
+                        f"retrying in {delay + jitter:.1f}s: {e}"
                     )
-                    time.sleep(1 * (retry_count + 1))
+                    time.sleep(delay + jitter)
             
             # Step 2: Brief pause before inserting items
             time.sleep(0.1)
             
-            # Step 3: Insert order_items with retry
+            # Step 3: Insert order_items with retry (exponential backoff + jitter)
             for retry_count in range(max_retries + 1):
                 try:
                     self.streaming_manager.insert_order_items(all_order_items)
                     items_inserted = True
                     break
-                except Exception as e:
+                except StreamingIngestError as e:
                     if retry_count >= max_retries:
                         logger.error(
                             f"Failed to insert order_items after {max_retries + 1} attempts: {e}",
@@ -106,10 +111,13 @@ class AutomatedIntelligenceStreaming:
                             f"{len(all_order_items)} order_items failed. Reconciliation will clean up."
                         )
                         raise
+                    delay = min(2 ** retry_count, 16)
+                    jitter = random.uniform(0, delay * 0.25)
                     logger.warning(
-                        f"Order_items insert failed (attempt {retry_count + 1}/{max_retries + 1}), retrying: {e}"
+                        f"Order_items insert failed (attempt {retry_count + 1}/{max_retries + 1}), "
+                        f"retrying in {delay + jitter:.1f}s: {e}"
                     )
-                    time.sleep(1 * (retry_count + 1))
+                    time.sleep(delay + jitter)
             
             # Both succeeded
             if orders_inserted and items_inserted:

@@ -30,6 +30,8 @@ USE WAREHOUSE AUTOMATED_INTELLIGENCE_WH;
 -- search queries in one conversation.
 
 CREATE OR REPLACE AGENT AUTOMATED_INTELLIGENCE.SEMANTIC.BUSINESS_INSIGHTS_AGENT
+  COMMENT = 'Multi-tool business insights agent with text-to-SQL, semantic search, and charting'
+  PROFILE = '{"display_name": "Business Insights Agent", "color": "blue"}'
 FROM SPECIFICATION $spec$
 {
   "models": {
@@ -66,6 +68,13 @@ FROM SPECIFICATION $spec$
         "name": "search_tickets",
         "description": "Semantic search over customer support tickets. Use for finding tickets about shipping problems, returns, product defects, billing issues, or any customer complaints and their resolutions."
       }
+    },
+    {
+      "tool_spec": {
+        "type": "data_to_chart",
+        "name": "data_to_chart",
+        "description": "Generates visualizations and charts from query results. Use when the user asks to see data visually, plot trends, or create charts."
+      }
     }
   ],
   "tool_resources": {
@@ -95,7 +104,7 @@ FROM SPECIFICATION $spec$
     }
   }
 }
-$$;
+$spec$;
 
 -- ============================================================================
 -- Verify Agent

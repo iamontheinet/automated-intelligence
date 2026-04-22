@@ -3,6 +3,9 @@
 # ============================================================================
 # NEVER commit these files - they contain passwords, tokens, and secrets
 
+# Streamlit secrets
+**/secrets.toml
+
 # Snowflake credentials
 config.toml
 **/config.toml

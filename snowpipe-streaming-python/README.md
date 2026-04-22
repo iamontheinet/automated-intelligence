@@ -317,6 +317,96 @@ ReconciliationManager(config).reconcile_and_cleanup()
 "
 ```
 
+## Architecture Notes
+
+### High-Performance Pipe-Based Architecture (GA Sep 2025)
+
+This codebase uses the **high-performance Snowpipe Streaming SDK** (`snowpipe-streaming` on PyPI),
+which replaced the classic `snowflake-ingest` package. The new SDK has a shared Rust core
+available in both Java and Python.
+
+Key characteristics:
+
+- **Different package**: `pip install snowpipe-streaming` (not `snowflake-ingest`)
+- **`StreamingIngestClient` takes a `pipe_name` parameter** that routes data through optimized Rust ingestion paths. See `snowpipe_streaming_manager.py:36-50` where separate clients are created per pipe (`ORDERS_PIPE`, `ORDER_ITEMS_PIPE`).
+- **`append_rows(rows, start_offset, end_offset)`** for batch inserts with offset token ranges, enabling exactly-once delivery. See `snowpipe_streaming_manager.py:200`.
+- **`append_row(row, offset_token)`** for single-row inserts. See `snowpipe_streaming_manager.py:137`.
+- **ReceiverSaturated / HTTP 429 backpressure handling** with exponential backoff + jitter (initial 1s, max 30s, 5 retries). See `_insert_with_backpressure_retry()` at `snowpipe_streaming_manager.py:172-235`.
+- **Automatic micro-batching** by the Rust core — the SDK accumulates rows client-side and flushes based on `max.client.lag` (time) or buffer size (~16 MB compressed).
+- **Per-GB billing** instead of compute + client count billing from the classic SDK.
+- **Server-side schema enforcement** through the PIPE definition, not client-side validation.
+
+**Performance**: Sub-second end-to-end latency (with low `max.client.lag`), millions of rows/sec per client, governed by network bandwidth and Snowflake receiver capacity.
+
+### Migration from Classic SDK (`snowflake-ingest`)
+
+If upgrading from the classic `snowflake-ingest` package:
+
+| Area | Classic (`snowflake-ingest`) | High-Performance (`snowpipe-streaming`) |
+|------|-----|------|
+| Package | `pip install snowflake-ingest` | `pip install snowpipe-streaming` |
+| Entry point | Data ingested directly into tables | Data ingested through PIPE objects |
+| Client mapping | One client, many tables | One client per pipe |
+| API | `insert_row` / `insert_rows` | `append_row` / `append_rows` |
+| Backpressure | Blocks thread (sleep) | Returns error (caller retries) |
+| Billing | Compute + client count | Flat per-GB ingested |
+
+Steps:
+
+1. **Create pipe objects** in Snowflake:
+   ```sql
+   CREATE PIPE my_pipe AS COPY INTO my_table
+       FROM TABLE(DATA_SOURCE(TYPE => 'STREAMING'))
+       MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+   ```
+
+2. **Swap the pip package**:
+   ```bash
+   pip uninstall snowflake-ingest
+   pip install snowpipe-streaming
+   ```
+
+3. **Pass `pipe_name` to `StreamingIngestClient`**:
+   ```python
+   # Old (classic, no pipe)
+   client = StreamingIngestClient(
+       client_name="MY_CLIENT",
+       db_name="MY_DB",
+       schema_name="MY_SCHEMA",
+       properties=props,
+   )
+
+   # New (high-performance, pipe-based)
+   client = StreamingIngestClient(
+       client_name="MY_CLIENT",
+       db_name="MY_DB",
+       schema_name="MY_SCHEMA",
+       pipe_name="MY_PIPE",       # <-- add this
+       properties=props,
+   )
+   ```
+
+4. **Replace insert calls** with offset-tracked variants:
+   ```python
+   # Old
+   channel.insert_row(row)
+
+   # New — single row
+   channel.append_row(row, offset_token)
+
+   # New — batch (preferred)
+   channel.append_rows(rows, start_offset, end_offset)
+   ```
+
+5. **Add backpressure retry logic** for `ReceiverSaturated` errors. The pipe-based architecture applies backpressure when the receiver is saturated — callers must handle `StreamingIngestError` containing `ReceiverSaturated` or HTTP 429 and retry with exponential backoff. See `_insert_with_backpressure_retry()` in this repo for a reference implementation.
+
+6. **Grant OPERATE on pipes** to your streaming role:
+   ```sql
+   GRANT OPERATE ON PIPE my_pipe TO ROLE my_role;
+   ```
+
+For the full migration guide, see the [Snowflake docs](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-migration).
+
 ## License
 
 Apache License 2.0
