@@ -166,8 +166,13 @@ def main():
         
         app.generate_and_stream_orders(num_orders)
         
-        logger.info("Waiting 5 seconds for final data flush...")
-        time.sleep(5)
+        logger.info("Waiting for all channel data to flush to Snowflake...")
+        flushed = streaming_manager.wait_for_flush(timeout_seconds=120)
+        if not flushed:
+            logger.warning(
+                "Channel flush timed out after 120s. "
+                "Reconciliation may report false orphans."
+            )
         
         # Run reconciliation to clean up any orphaned records
         logger.info("\n" + "="*60)

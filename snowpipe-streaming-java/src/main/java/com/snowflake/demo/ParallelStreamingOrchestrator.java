@@ -161,7 +161,11 @@ public class ParallelStreamingOrchestrator {
             
             ordersGenerated = app.generateAndStreamOrders(numOrders);
             
-            Thread.sleep(2000);
+            // Wait for this instance's channels to flush before declaring success
+            boolean flushed = streamingManager.waitForFlush(120, 2000);
+            if (!flushed) {
+                logger.warn("Instance {} channels did not fully flush within 120s", instanceId);
+            }
             
             long duration = System.currentTimeMillis() - startTime;
             return new StreamingResult(instanceId, ordersGenerated, duration, true);

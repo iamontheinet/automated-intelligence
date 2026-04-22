@@ -143,8 +143,11 @@ public class AutomatedIntelligenceStreaming {
 
             app.generateAndStreamOrders(numOrders);
 
-            logger.info("Waiting 5 seconds for final data flush...");
-            Thread.sleep(5000);
+            logger.info("Waiting for all channel data to flush to Snowflake...");
+            boolean flushed = streamingManager.waitForFlush();
+            if (!flushed) {
+                logger.warn("Channel flush timed out after 120s. Reconciliation may report false orphans.");
+            }
 
             // Run reconciliation to clean up any orphaned records
             logger.info("\n" + "=".repeat(60));

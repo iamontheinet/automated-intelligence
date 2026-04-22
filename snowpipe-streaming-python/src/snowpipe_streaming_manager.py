@@ -17,6 +17,8 @@ class SnowpipeStreamingManager:
     def __init__(self, config: ConfigManager, instance_id: int = -1):
         self.config = config
         self.instance_id = instance_id
+        self._last_orders_offset: str | None = None
+        self._last_order_items_offset: str | None = None
         
         channel_suffix = f"_instance_{instance_id}" if instance_id >= 0 else ""
         logger.info(
@@ -149,6 +151,7 @@ class SnowpipeStreamingManager:
         self._insert_with_backpressure_retry(
             self.orders_channel, rows, start_offset, end_offset, "orders"
         )
+        self._last_orders_offset = end_offset
         logger.debug(
             f"Inserted {len(orders)} orders (offset range: {start_offset} to {end_offset})"
         )
@@ -165,6 +168,7 @@ class SnowpipeStreamingManager:
         self._insert_with_backpressure_retry(
             self.order_items_channel, rows, start_offset, end_offset, "order_items"
         )
+        self._last_order_items_offset = end_offset
         logger.debug(
             f"Inserted {len(items)} order items (offset range: {start_offset} to {end_offset})"
         )
@@ -239,6 +243,65 @@ class SnowpipeStreamingManager:
 
     def get_latest_order_item_offset(self) -> Optional[str]:
         return self.order_items_channel.get_latest_committed_offset_token()
+
+    def wait_for_flush(self, timeout_seconds: int = 120, poll_interval: float = 2.0) -> bool:
+        """
+        Wait until both channels have committed all in-flight data.
+        Polls each channel's latest committed offset token until it matches
+        the last offset we sent, confirming Snowflake has received everything.
+
+        Returns True if both channels flushed within the timeout, False otherwise.
+        """
+        logger.info("Waiting for all channels to flush in-flight data...")
+        start = time.time()
+
+        channels_to_check = []
+        if self._last_orders_offset:
+            channels_to_check.append(
+                ("orders", self.orders_channel, self._last_orders_offset)
+            )
+        if self._last_order_items_offset:
+            channels_to_check.append(
+                ("order_items", self.order_items_channel, self._last_order_items_offset)
+            )
+
+        if not channels_to_check:
+            logger.info("No data was sent — nothing to flush")
+            return True
+
+        flushed = {name: False for name, _, _ in channels_to_check}
+
+        while time.time() - start < timeout_seconds:
+            all_done = True
+            for name, channel, expected_offset in channels_to_check:
+                if flushed[name]:
+                    continue
+                committed = channel.get_latest_committed_offset_token()
+                if committed == expected_offset:
+                    elapsed = time.time() - start
+                    logger.info(
+                        f"Channel {name} flushed (offset {committed}) in {elapsed:.1f}s"
+                    )
+                    flushed[name] = True
+                else:
+                    all_done = False
+
+            if all_done:
+                total = time.time() - start
+                logger.info(f"All channels flushed in {total:.1f}s")
+                return True
+
+            time.sleep(poll_interval)
+
+        # Timeout — log which channels are still pending
+        for name, channel, expected_offset in channels_to_check:
+            if not flushed[name]:
+                committed = channel.get_latest_committed_offset_token()
+                logger.warning(
+                    f"Channel {name} NOT flushed after {timeout_seconds}s "
+                    f"(expected: {expected_offset}, committed: {committed})"
+                )
+        return False
 
     def close(self) -> None:
         try:

@@ -30,6 +30,8 @@ public class SnowpipeStreamingManager {
     private final SnowflakeStreamingIngestChannel orderItemsChannel;
     private final ConfigManager config;
     private final Properties connectionProps;
+    private volatile String lastOrdersOffset;
+    private volatile String lastOrderItemsOffset;
 
     public SnowpipeStreamingManager(ConfigManager config) throws Exception {
         this(config, -1);
@@ -163,6 +165,7 @@ public class SnowpipeStreamingManager {
                 .collect(Collectors.toList());
         
         insertWithBackpressureRetry(ordersChannel, rows, startOffset, endOffset, "orders");
+        this.lastOrdersOffset = endOffset;
         logger.debug("Inserted {} orders (offset range: {} to {})", 
                     orders.size(), startOffset, endOffset);
     }
@@ -180,6 +183,7 @@ public class SnowpipeStreamingManager {
                 .collect(Collectors.toList());
         
         insertWithBackpressureRetry(orderItemsChannel, rows, startOffset, endOffset, "order_items");
+        this.lastOrderItemsOffset = endOffset;
         logger.debug("Inserted {} order items (offset range: {} to {})", 
                     items.size(), startOffset, endOffset);
     }
@@ -200,7 +204,7 @@ public class SnowpipeStreamingManager {
             String endOffset,
             String dataType) throws Exception {
         
-        int maxRetries = 5;
+        int maxRetries = 10;
         double delay = 1.0;  // Initial delay in seconds
         double maxDelay = 30.0;
         
@@ -218,7 +222,10 @@ public class SnowpipeStreamingManager {
                 String errorMsg = e.getMessage();
                 
                 // Check for ReceiverSaturated (HTTP 429) backpressure errors
-                if (errorMsg.contains("ReceiverSaturated") || errorMsg.contains("429")) {
+                // The Java SDK wraps the error — message may contain "ReceiverSaturated",
+                // "429", or "running full" depending on the SDK version
+                if (errorMsg.contains("ReceiverSaturated") || errorMsg.contains("429") 
+                        || errorMsg.contains("running full") || errorMsg.contains("cannot be accepted")) {
                     if (attempt < maxRetries - 1) {
                         logger.warn("Backpressure detected for {} (attempt {}/{}): " +
                                    "Channel buffers full. Retrying in {:.1f}s...",
@@ -247,6 +254,74 @@ public class SnowpipeStreamingManager {
 
     public String getLatestOrderItemOffset() {
         return orderItemsChannel.getLatestCommittedOffsetToken();
+    }
+
+    /**
+     * Wait until both channels have committed all in-flight data.
+     * Polls each channel's latest committed offset token until it matches
+     * the last offset we sent, confirming Snowflake has received everything.
+     *
+     * @param timeoutSeconds Maximum time to wait
+     * @param pollIntervalMs Polling interval in milliseconds
+     * @return true if both channels flushed within the timeout
+     */
+    public boolean waitForFlush(int timeoutSeconds, long pollIntervalMs) throws InterruptedException {
+        logger.info("Waiting for all channels to flush in-flight data...");
+        long start = System.currentTimeMillis();
+        long timeoutMs = timeoutSeconds * 1000L;
+
+        boolean ordersFlushed = (lastOrdersOffset == null);
+        boolean itemsFlushed = (lastOrderItemsOffset == null);
+
+        if (ordersFlushed && itemsFlushed) {
+            logger.info("No data was sent — nothing to flush");
+            return true;
+        }
+
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            if (!ordersFlushed) {
+                String committed = ordersChannel.getLatestCommittedOffsetToken();
+                if (lastOrdersOffset.equals(committed)) {
+                    long elapsed = System.currentTimeMillis() - start;
+                    logger.info("Channel orders flushed (offset {}) in {}ms", committed, elapsed);
+                    ordersFlushed = true;
+                }
+            }
+
+            if (!itemsFlushed) {
+                String committed = orderItemsChannel.getLatestCommittedOffsetToken();
+                if (lastOrderItemsOffset.equals(committed)) {
+                    long elapsed = System.currentTimeMillis() - start;
+                    logger.info("Channel order_items flushed (offset {}) in {}ms", committed, elapsed);
+                    itemsFlushed = true;
+                }
+            }
+
+            if (ordersFlushed && itemsFlushed) {
+                long total = System.currentTimeMillis() - start;
+                logger.info("All channels flushed in {}ms", total);
+                return true;
+            }
+
+            Thread.sleep(pollIntervalMs);
+        }
+
+        // Timeout — log which channels are still pending
+        if (!ordersFlushed) {
+            String committed = ordersChannel.getLatestCommittedOffsetToken();
+            logger.warn("Channel orders NOT flushed after {}s (expected: {}, committed: {})",
+                        timeoutSeconds, lastOrdersOffset, committed);
+        }
+        if (!itemsFlushed) {
+            String committed = orderItemsChannel.getLatestCommittedOffsetToken();
+            logger.warn("Channel order_items NOT flushed after {}s (expected: {}, committed: {})",
+                        timeoutSeconds, lastOrderItemsOffset, committed);
+        }
+        return false;
+    }
+
+    public boolean waitForFlush() throws InterruptedException {
+        return waitForFlush(120, 2000);
     }
 
     public void close() {
