@@ -176,6 +176,41 @@ AUTOMATED_INTELLIGENCE (Database)
 | `snowflake-mcp-server/` | MCP server for external AI agents |
 | `tests/` | Test notebooks and SQL validation |
 
+## MCP Server (AI_GATEWAY) Client Setup
+
+The `AI_GATEWAY` MCP server in `SEMANTIC` schema exposes 5 tools via Streamable HTTP:
+- `product-reviews-search` — Cortex Search over product reviews
+- `support-tickets-search` — Cortex Search over support tickets
+- `business-insights` — Cortex Analyst via `BUSINESS_ANALYTICS_SEMANTIC` semantic view
+- `product-recommendations` — SPCS stored proc (`GET_PRODUCT_RECOMMENDATIONS`)
+- `execute-sql` — Run arbitrary SQL against the database
+
+**Endpoint**: `https://sfsenorthamerica-gen_ai_hol.snowflakecomputing.com/api/v2/databases/AUTOMATED_INTELLIGENCE/schemas/SEMANTIC/mcp-servers/AI_GATEWAY`
+
+**Auth**: PAT via `PAT_SI` env var + header `X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN`
+
+### Client Connection Pattern
+
+MCP clients (Cursor, VS Code, Claude Desktop) attempt OAuth dynamic client registration first, which Snowflake doesn't support. The workaround is `mcp-remote` as a stdio-to-HTTP bridge:
+
+```json
+{
+  "command": "npx",
+  "args": [
+    "-y", "mcp-remote@latest",
+    "<MCP_ENDPOINT_URL>",
+    "--header", "Authorization: Bearer <PAT>",
+    "--header", "X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN"
+  ]
+}
+```
+
+- **Cursor** (`~/.cursor/mcp.json`): Use `"mcpServers"` key with `"command"/"args"` (stdio). Works reliably.
+- **VS Code** (`.vscode/mcp.json`): Use `"servers"` key with `"command"/"args"` + `"inputs"` for `${input:pat-si}` prompt. Native `"type": "http"` with `"headers"` does NOT work as of VS Code 1.112 (server not discoverable).
+- **Claude Desktop**: Same `mcp-remote` pattern in `claude_desktop_config.json`.
+
+**Prerequisites**: Node.js/npm (for `npx mcp-remote`), `PAT_SI` env var set.
+
 ## Common Commands
 
 ```bash

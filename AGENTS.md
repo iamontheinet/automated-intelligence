@@ -11,7 +11,6 @@ Multi-domain demo monorepo showcasing Snowflake features. Each subdirectory is a
 ```
 setup.sql                      ← Root DDL: creates base objects (AUTOMATED_INTELLIGENCE DB, schemas, etc.)
 setup/                         ← Additional setup scripts
-ai-agent-chat-app/             ← Cortex Agent React + FastAPI demo
 ai-sql-demo/                   ← AI SQL features demo
 data-quality/                  ← DMF and data quality demos
 dbt-analytics/                 ← dbt project
